@@ -21,7 +21,7 @@ export const Menu: React.FC<MenuProps> = ({
   isAuthenticated
 }) => {
   const { gameState } = useGame();
-  const FORCE_LEVELS_UNLOCKED = true;
+  const FORCE_LEVELS_UNLOCKED = false;
   const [currentPage, setCurrentPage] = useState(0);
   const levelsPerPage = 20;
   const totalPages = Math.ceil(LEVELS.length / levelsPerPage);
