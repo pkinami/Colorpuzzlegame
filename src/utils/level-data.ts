@@ -17,14 +17,21 @@ export interface Tube {
   starter?: boolean;
 }
 
+export interface StarThreshold {
+  moves: number;
+  timeSeconds: number;
+}
+
 export interface Level {
   id: number;
   name: string;
   tubes: Tube[];
   starThresholds: {
-    three: number;
-    two: number;
-    one: number;
+    five: StarThreshold;
+    four: StarThreshold;
+    three: StarThreshold;
+    two: StarThreshold;
+    one: StarThreshold;
   };
   difficulty: 'easy' | 'medium' | 'hard' | 'expert' | 'master' | 'legendary';
   moveLimit: number;
@@ -203,53 +210,24 @@ const getContainerCountForLevel = (levelId: number, colorCount: number): number 
   return Math.max(16, colorCount + 4);
 };
 
-const getMoveLimitForLevel = (levelId: number, optimalMoves: number): number => {
-  if (levelId <= 50) {
-    const buffer = clamp(interpolateRange(levelId, 1, 50, 40, 24), 24, 48);
-    return optimalMoves + buffer;
-  }
-
-  if (levelId <= 100) {
-    const buffer = clamp(interpolateRange(levelId, 51, 100, 24, 16), 16, 32);
-    return optimalMoves + buffer;
-  }
-
-  if (levelId <= 200) {
-    const buffer = clamp(interpolateRange(levelId, 101, 200, 15, 10), 10, 24);
-    return optimalMoves + buffer;
-  }
-
-  if (levelId <= 350) {
-    const buffer = clamp(interpolateRange(levelId, 201, 350, 9, 6), 6, 18);
-    return optimalMoves + buffer;
-  }
-
-  const buffer = clamp(interpolateRange(levelId, 351, 500, 5, 4), 4, 12);
-  return optimalMoves + buffer;
+const getMoveLimitForLevel = (_levelId: number, optimalMoves: number): number => {
+  return optimalMoves + 3;
 };
 
 const getTimeLimitForLevel = (levelId: number): number => {
-  if (levelId <= 50) {
-    return clamp(interpolateRange(levelId, 1, 50, 900, 600), 600, 900);
+  if (levelId <= 1) {
+    return 15;
   }
 
-  if (levelId <= 100) {
-    return clamp(interpolateRange(levelId, 51, 100, 580, 480), 480, 620);
+  if (levelId >= 500) {
+    return 300;
   }
 
-  if (levelId <= 200) {
-    return clamp(interpolateRange(levelId, 101, 200, 460, 360), 360, 520);
-  }
-
-  if (levelId <= 300) {
-    return clamp(interpolateRange(levelId, 201, 300, 330, 270), 270, 420);
-  }
-
-  if (levelId <= 400) {
-    return clamp(interpolateRange(levelId, 301, 400, 240, 210), 210, 330);
-  }
-
-  return clamp(interpolateRange(levelId, 401, 500, 200, 180), 180, 300);
+  const minSeconds = 15;
+  const maxSeconds = 300;
+  const progress = (levelId - 1) / (500 - 1);
+  const interpolated = minSeconds + (maxSeconds - minSeconds) * progress;
+  return Math.round(interpolated);
 };
 
 const applySpecialContainers = (levelId: number, emptyTubes: Tube[]): void => {
@@ -318,20 +296,35 @@ function generateLevel(id: number): Level {
   const moveLimit = getMoveLimitForLevel(id, optimalMoves);
   const timeLimitSeconds = getTimeLimitForLevel(id);
 
-  const rawThree = optimalMoves + Math.floor(id / 12);
-  const rawTwo = optimalMoves + Math.floor(id / 8) + 4;
-  const rawOne = optimalMoves + Math.floor(id / 6) + 8;
+  const clampMoves = (value: number) => Math.min(value, moveLimit);
+  const computeTimeThreshold = (ratio: number) => {
+    const threshold = Math.round(timeLimitSeconds * ratio);
+    return clamp(Math.max(1, threshold), 1, timeLimitSeconds);
+  };
 
-  const clampThreshold = (value: number) => Math.min(value, moveLimit);
-
-  let three = clampThreshold(rawThree);
-  let two = Math.max(three, clampThreshold(rawTwo));
-  let one = Math.max(two, clampThreshold(rawOne));
+  const timeThresholds = [0.35, 0.5, 0.7, 0.85, 1].map(computeTimeThreshold);
 
   const starThresholds = {
-    three,
-    two,
-    one
+    five: {
+      moves: clampMoves(optimalMoves),
+      timeSeconds: timeThresholds[0]
+    },
+    four: {
+      moves: clampMoves(optimalMoves + 1),
+      timeSeconds: Math.max(timeThresholds[0], timeThresholds[1])
+    },
+    three: {
+      moves: clampMoves(optimalMoves + 2),
+      timeSeconds: Math.max(timeThresholds[1], timeThresholds[2])
+    },
+    two: {
+      moves: clampMoves(optimalMoves + 3),
+      timeSeconds: Math.max(timeThresholds[2], timeThresholds[3])
+    },
+    one: {
+      moves: moveLimit,
+      timeSeconds: Math.max(timeThresholds[3], timeThresholds[4])
+    }
   };
 
   return {
