@@ -479,8 +479,12 @@ export const Menu: React.FC<MenuProps> = ({
         {/* Header */}
         <div className="mb-8 text-center md:mb-12 flex-shrink-0">
           <h1
-            className="mb-4 text-5xl md:text-7xl font-black bg-gradient-to-r from-pink-400 via-purple-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent"
-            style={{ backgroundSize: '200% auto', textShadow: '0 4px 22px rgba(15, 23, 42, 0.75)' }}
+            className="mb-4 text-5xl md:text-7xl font-black bg-clip-text text-transparent"
+            style={{
+              backgroundImage: 'linear-gradient(90deg, #f5f5f5 0%, #c7cad1 45%, #9fa3ad 60%, #f5f5f5 100%)',
+              backgroundSize: '200% auto',
+              textShadow: '0 4px 22px rgba(10, 12, 16, 0.75)'
+            }}
           >
             CRAYON
           </h1>
