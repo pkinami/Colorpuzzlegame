@@ -265,7 +265,8 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       if (isComplete) {
         const level = LEVELS.find(l => l.id === gameState.currentLevel);
         if (level) {
-          starsEarned = PourSystem.calculateStars(newMoves, level.starThresholds);
+          const timeUsed = Math.max(0, level.timeLimitSeconds - gameState.timeRemaining);
+          starsEarned = PourSystem.calculateStars(newMoves, timeUsed, level.starThresholds);
 
           // Update progress
           const updatedProgress = { ...gameState.userProgress };

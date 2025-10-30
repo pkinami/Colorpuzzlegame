@@ -376,7 +376,7 @@ export const Menu: React.FC<MenuProps> = ({
 
                           {/* Stars */}
                           <div className="flex gap-1 mb-2">
-                            {[1, 2, 3].map(star => (
+                            {[1, 2, 3, 4, 5].map(star => (
                               <Star
                                 key={star}
                                 size={14}

@@ -207,6 +207,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({ onBackToMenu }) => {
   }, [currentLevel]);
 
   const formattedCountdownTime = formatTime(gameState.timeRemaining);
+  const timeUsedSeconds = Math.max(0, gameState.timeLimitSeconds - gameState.timeRemaining);
+  const formattedCompletionTime = formatTime(timeUsedSeconds);
   const isTimeCritical = gameState.timeRemaining <= 30;
   const isMoveCritical = gameState.remainingMoves <= Math.max(2, Math.ceil(gameState.moveLimit * 0.15));
   const failureReason = gameState.isFailed
@@ -432,7 +434,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ onBackToMenu }) => {
               </h2>
 
               <div className="flex justify-center gap-4 mb-8">
-                {[1, 2, 3].map(star => (
+                {[1, 2, 3, 4, 5].map(star => (
                   <Star
                     key={star}
                     size={56}
@@ -448,11 +450,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({ onBackToMenu }) => {
                 ))}
               </div>
 
-              <p className="mb-8 text-xl md:text-2xl text-white word-shadow-soft">
-                Completed in <span className="font-black text-3xl md:text-4xl text-yellow-100 word-shadow-strong">
-                  {gameState.moves}
-                </span> moves
-              </p>
+              <div className="mb-8 text-xl md:text-2xl text-white word-shadow-soft space-y-3">
+                <p>
+                  Completed in <span className="font-black text-3xl md:text-4xl text-yellow-100 word-shadow-strong">
+                    {gameState.moves}
+                  </span>{' '}
+                  moves
+                </p>
+                <p>
+                  Time used:{' '}
+                  <span className="font-black text-3xl md:text-4xl text-yellow-100 word-shadow-strong">
+                    {formattedCompletionTime}
+                  </span>
+                </p>
+              </div>
 
               <div className="flex gap-4">
                 <button

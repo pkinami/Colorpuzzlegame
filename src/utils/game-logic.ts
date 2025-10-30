@@ -1,4 +1,4 @@
-import { Tube, ColorSegment } from './level-data';
+import { Tube, ColorSegment, Level } from './level-data';
 
 export interface PourResult {
   success: boolean;
@@ -112,10 +112,24 @@ export class PourSystem {
     return true;
   }
 
-  static calculateStars(moves: number, starThresholds: { three: number; two: number; one: number }): number {
-    if (moves <= starThresholds.three) return 3;
-    if (moves <= starThresholds.two) return 2;
-    if (moves <= starThresholds.one) return 1;
+  static calculateStars(moves: number, timeUsedSeconds: number, starThresholds: Level['starThresholds']): number {
+    const safeMoves = Math.max(0, moves);
+    const safeTimeUsed = Math.max(0, timeUsedSeconds);
+
+    const thresholds: Array<{ stars: number; requirement: { moves: number; timeSeconds: number } }> = [
+      { stars: 5, requirement: starThresholds.five },
+      { stars: 4, requirement: starThresholds.four },
+      { stars: 3, requirement: starThresholds.three },
+      { stars: 2, requirement: starThresholds.two },
+      { stars: 1, requirement: starThresholds.one }
+    ];
+
+    for (const { stars, requirement } of thresholds) {
+      if (safeMoves <= requirement.moves && safeTimeUsed <= requirement.timeSeconds) {
+        return stars;
+      }
+    }
+
     return 0;
   }
 
