@@ -144,6 +144,25 @@ export const GameBoard: React.FC<GameBoardProps> = ({ onBackToMenu }) => {
     palette[2] ?? '#f472b6'
   ];
 
+  const completionMessage = useMemo(() => {
+    const stars = Math.max(0, Math.min(5, Math.round(gameState.stars)));
+
+    switch (stars) {
+      case 5:
+        return 'Legendary!';
+      case 4:
+        return 'Brilliant!';
+      case 3:
+        return 'Awesome!';
+      case 2:
+        return 'Great!';
+      case 1:
+        return 'Nice!';
+      default:
+        return 'Try Again!';
+    }
+  }, [gameState.stars]);
+
   const boardBackgroundStyle = useMemo<React.CSSProperties>(
     () => ({
       backgroundColor: '#000000',
@@ -429,8 +448,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({ onBackToMenu }) => {
             onClick={e => e.stopPropagation()}
           >
             <div className="text-center relative z-10">
-              <h2 className="mb-6 text-4xl md:text-5xl font-black text-white word-shadow-strong tracking-[0.25em] uppercase">
-                🎉 LEVEL COMPLETE! 🎉
+              <h2 className="mb-6 text-4xl md:text-5xl font-black text-white word-shadow-strong tracking-[0.25em]">
+                🎉 {completionMessage} 🎉
               </h2>
 
               <div className="flex justify-center gap-4 mb-8">
