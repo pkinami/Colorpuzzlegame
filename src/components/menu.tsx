@@ -444,7 +444,7 @@ export const Menu: React.FC<MenuProps> = ({
                 className={`transition-all rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-white ${
                   isActive
                     ? 'w-4 h-4 bg-white shadow-lg shadow-white/50 scale-110'
-                    : 'w-3 h-3 bg-white/40 hover:bg-white/60'
+                    : 'w-3 h-3 bg-white/80 hover:bg-white border border-white/70'
                 }`}
                 aria-current={isActive ? 'true' : undefined}
                 aria-label={`Go to page ${index + 1}`}

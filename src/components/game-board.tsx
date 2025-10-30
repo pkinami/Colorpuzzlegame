@@ -296,7 +296,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ onBackToMenu }) => {
     }}
   >
     <div className="text-xs uppercase text-white/80 word-shadow-soft tracking-[0.28em]">
-      oves Used
+      Moves Used
     </div>
     <div className="text-2xl font-bold word-shadow-strong text-yellow-100">
       {gameState.moves} / {gameState.moveLimit}
@@ -575,6 +575,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({ onBackToMenu }) => {
           </p>
         </div>
       )}
+
+      <button
+        type="button"
+        onClick={onBackToMenu}
+        className="fixed left-4 bottom-4 sm:left-6 sm:bottom-6 z-40 flex items-center gap-2 px-4 py-3 sm:px-5 sm:py-3 rounded-2xl backdrop-blur-md border border-white/30 bg-slate-950/80 text-white shadow-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 hover:bg-slate-900/90"
+        aria-label="Exit to homepage"
+      >
+        <Home size={18} className="text-white" />
+        <span className="text-xs sm:text-sm font-bold uppercase tracking-[0.26em]">Exit</span>
+      </button>
     </div>
   );
 };
