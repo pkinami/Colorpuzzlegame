@@ -1,0 +1,6 @@
+﻿{
+  "appId": "com.kinami.colorpuzzlegame",
+  "appName": "Color Puzzle Game",
+  "webDir": "build",
+  "bundledWebRuntime": false
+}
