@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Mail, Lock, User } from 'lucide-react';
 
 interface AuthModalProps {
@@ -14,6 +14,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuth, onSkip })
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    document.body.classList.add('auth-modal-open');
+
+    return () => {
+      document.body.classList.remove('auth-modal-open');
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +39,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuth, onSkip })
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center p-4 z-50 overflow-hidden"
+      className="auth-modal fixed inset-0 flex items-center justify-center p-4 z-50 overflow-hidden"
       style={{
         background:
           'radial-gradient(circle at 20% 15%, rgba(250, 204, 21, 0.2), transparent 55%), radial-gradient(circle at 80% 0%, rgba(59, 130, 246, 0.18), transparent 60%), radial-gradient(circle at 50% 90%, rgba(244, 114, 182, 0.22), transparent 60%), linear-gradient(145deg, #010103 0%, #030712 50%, #010103 100%)',
