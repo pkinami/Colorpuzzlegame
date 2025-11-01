@@ -5,6 +5,7 @@
 
   export default defineConfig({
     plugins: [react()],
+    assetsInclude: ['**/*.lottie'],
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       alias: {
