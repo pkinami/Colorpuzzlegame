@@ -98,10 +98,10 @@ export const Tube: React.FC<TubeProps> = ({
         <div
           className={`relative rounded-b-3xl overflow-hidden ${
             isSelected
-              ? 'border-cyan-400 shadow-xl shadow-cyan-500/50'
+              ? 'border-cyan-300 shadow-xl shadow-cyan-400/50'
               : isDisabled
-                ? 'border-gray-700/50 shadow-md opacity-70'
-                : 'border-gray-500/40 shadow-md'
+                ? 'border-white/20 shadow-lg opacity-70'
+                : 'border-white/50 shadow-lg'
           } ${allowAnimation ? 'transition-colors duration-300' : ''}`}
           style={{
             width: tubeWidth,
@@ -193,7 +193,7 @@ export const Tube: React.FC<TubeProps> = ({
           {/* Tube neck (top opening) */}
           <div
             className={`absolute left-1/2 transform -translate-x-1/2 border-b-0 rounded-t-lg ${
-              isSelected ? 'border-cyan-400' : 'border-gray-600/50'
+              isSelected ? 'border-cyan-300' : 'border-white/60'
             } ${allowAnimation ? 'transition-colors duration-300' : ''}`}
             style={{
               width: neckWidth,
