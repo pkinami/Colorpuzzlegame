@@ -168,25 +168,25 @@ export const GameBoard: React.FC = () => {
         </div>
       </div>
 
-      <footer className="px-5 sm:px-8 pb-10">
-        <div className="mx-auto max-w-3xl flex flex-wrap items-center justify-center gap-4">
+      <footer className="px-5 sm:px-8 pt-4 pb-12">
+        <div className="mx-auto max-w-3xl w-full flex flex-col sm:flex-row flex-wrap items-center justify-center gap-4 sm:gap-6">
           <button
             onClick={undoMove}
             disabled={moveHistory.length === 0}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-b from-yellow-200 via-yellow-300 to-yellow-500 text-black font-semibold px-6 py-3 text-sm uppercase tracking-[0.2em] shadow-[0_6px_0_#b45309] transition-all disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed active:translate-y-1 active:shadow-[0_3px_0_#b45309]"
+            className="flex items-center gap-2 rounded-2xl bg-gradient-to-b from-yellow-200 via-yellow-300 to-yellow-500 text-black font-semibold px-7 py-3 text-sm uppercase tracking-[0.2em] shadow-[0_8px_0_#b45309] transition-all disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed active:translate-y-[4px] active:shadow-[0_4px_0_#b45309]"
           >
             <Undo2 size={18} /> Undo
           </button>
           <button
             onClick={redoMove}
             disabled={redoHistory.length === 0}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-b from-yellow-200 via-yellow-300 to-yellow-500 text-black font-semibold px-6 py-3 text-sm uppercase tracking-[0.2em] shadow-[0_6px_0_#b45309] transition-all disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed active:translate-y-1 active:shadow-[0_3px_0_#b45309]"
+            className="flex items-center gap-2 rounded-2xl bg-[#1f1f1f] text-white font-semibold px-7 py-3 text-sm uppercase tracking-[0.2em] shadow-[0_4px_0_rgba(0,0,0,0.6)] transition-all disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed active:translate-y-[2px] active:shadow-[0_2px_0_rgba(0,0,0,0.6)]"
           >
             <Redo2 size={18} /> Redo
           </button>
           <button
             onClick={resetLevel}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-b from-yellow-200 via-yellow-300 to-yellow-500 text-black font-semibold px-6 py-3 text-sm uppercase tracking-[0.2em] shadow-[0_6px_0_#b45309] transition-all active:translate-y-1 active:shadow-[0_3px_0_#b45309]"
+            className="flex items-center gap-2 rounded-2xl bg-gradient-to-b from-yellow-200 via-yellow-300 to-yellow-500 text-black font-semibold px-7 py-3 text-sm uppercase tracking-[0.2em] shadow-[0_8px_0_#b45309] transition-all active:translate-y-[4px] active:shadow-[0_4px_0_#b45309]"
           >
             <RotateCcw size={18} /> Reset
           </button>
@@ -231,18 +231,6 @@ export const GameBoard: React.FC = () => {
                 {hasNextLevel ? 'Next Level' : 'Restart'}
               </button>
             </div>
-            <h2 className="text-2xl font-semibold tracking-[0.18em] uppercase mb-4 text-white/90">
-              {failureReason === 'time' ? 'Time Up' : failureReason === 'moves' ? 'No Moves' : 'Try Again'}
-            </h2>
-            <p className="text-sm text-white/60 mb-6 tracking-[0.1em]">
-              Tap retry to give this level another shot.
-            </p>
-            <button
-              onClick={resetLevel}
-              className="rounded-full bg-yellow-400/90 text-black font-semibold px-5 py-3 text-sm uppercase tracking-[0.28em]"
-            >
-              Retry Level
-            </button>
           </div>
         </div>
       )}
