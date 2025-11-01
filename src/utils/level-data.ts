@@ -247,8 +247,121 @@ const applySpecialContainers = (levelId: number, emptyTubes: Tube[]): void => {
   }
 };
 
+const STATIC_COLORS = {
+  red: '#d92128',
+  yellow: '#f6e65a',
+  blue: '#1c74f0',
+  green: '#30b463',
+  pink: '#f7b7d6'
+} as const;
+
+const createStaticSegment = (color: string, key: string): ColorSegment => ({
+  id: `static-${key}`,
+  color
+});
+
+const STATIC_LEVEL_OVERRIDES: Partial<Record<number, Level>> = {
+  6: {
+    id: 6,
+    name: 'Classic Mix',
+    difficulty: 'easy',
+    starThresholds: {
+      five: { moves: 12, timeSeconds: 60 },
+      four: { moves: 13, timeSeconds: 75 },
+      three: { moves: 14, timeSeconds: 90 },
+      two: { moves: 16, timeSeconds: 105 },
+      one: { moves: 24, timeSeconds: 120 }
+    },
+    tubes: [
+      {
+        id: 'tube-6-1',
+        capacity: 4,
+        segments: [
+          createStaticSegment(STATIC_COLORS.yellow, '6-1-1'),
+          createStaticSegment(STATIC_COLORS.red, '6-1-2'),
+          createStaticSegment(STATIC_COLORS.red, '6-1-3'),
+          createStaticSegment(STATIC_COLORS.red, '6-1-4')
+        ]
+      },
+      {
+        id: 'tube-6-2',
+        capacity: 4,
+        segments: [
+          createStaticSegment(STATIC_COLORS.blue, '6-2-1'),
+          createStaticSegment(STATIC_COLORS.yellow, '6-2-2'),
+          createStaticSegment(STATIC_COLORS.blue, '6-2-3'),
+          createStaticSegment(STATIC_COLORS.yellow, '6-2-4')
+        ]
+      },
+      {
+        id: 'tube-6-3',
+        capacity: 4,
+        segments: [
+          createStaticSegment(STATIC_COLORS.green, '6-3-1'),
+          createStaticSegment(STATIC_COLORS.blue, '6-3-2'),
+          createStaticSegment(STATIC_COLORS.green, '6-3-3'),
+          createStaticSegment(STATIC_COLORS.yellow, '6-3-4')
+        ]
+      },
+      {
+        id: 'tube-6-4',
+        capacity: 4,
+        segments: [
+          createStaticSegment(STATIC_COLORS.green, '6-4-1'),
+          createStaticSegment(STATIC_COLORS.yellow, '6-4-2'),
+          createStaticSegment(STATIC_COLORS.blue, '6-4-3'),
+          createStaticSegment(STATIC_COLORS.green, '6-4-4')
+        ]
+      },
+      {
+        id: 'tube-6-5',
+        capacity: 4,
+        segments: [
+          createStaticSegment(STATIC_COLORS.pink, '6-5-1'),
+          createStaticSegment(STATIC_COLORS.pink, '6-5-2'),
+          createStaticSegment(STATIC_COLORS.pink, '6-5-3'),
+          createStaticSegment(STATIC_COLORS.pink, '6-5-4')
+        ]
+      },
+      {
+        id: 'tube-6-6',
+        capacity: 4,
+        segments: [
+          createStaticSegment(STATIC_COLORS.pink, '6-6-1'),
+          createStaticSegment(STATIC_COLORS.yellow, '6-6-2'),
+          createStaticSegment(STATIC_COLORS.yellow, '6-6-3')
+        ]
+      },
+      {
+        id: 'tube-6-7',
+        capacity: 4,
+        segments: []
+      },
+      {
+        id: 'tube-6-8',
+        capacity: 4,
+        segments: []
+      }
+    ],
+    moveLimit: 24,
+    timeLimitSeconds: 120,
+    randomizeOnStart: false
+  }
+};
+
 // Generate a level with progressive difficulty up to level 500
 function generateLevel(id: number): Level {
+  const override = STATIC_LEVEL_OVERRIDES[id];
+  if (override) {
+    return {
+      ...override,
+      tubes: override.tubes.map(tube => ({
+        ...tube,
+        segments: tube.segments.map(segment => ({ ...segment }))
+      }))
+    };
+  }
+
   const baseCapacity = 4;
 
   const numColors = getColorCountForLevel(id);
