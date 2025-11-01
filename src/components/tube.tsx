@@ -23,8 +23,8 @@ export const Tube: React.FC<TubeProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const scaleFactor = Math.max(0.6, scale);
   const verticalFactor = Math.max(1, heightScale);
-  const baseSegmentHeight = 56;
-  const baseTubeWidth = 70;
+  const baseSegmentHeight = 52;
+  const baseTubeWidth = 68;
   const segmentHeight = baseSegmentHeight * scaleFactor * verticalFactor;
   const tubeWidth = baseTubeWidth * scaleFactor;
   const tubeHeight = tube.capacity * segmentHeight;
@@ -100,13 +100,13 @@ export const Tube: React.FC<TubeProps> = ({
             isSelected
               ? 'border-cyan-400 shadow-xl shadow-cyan-500/50'
               : isDisabled
-                ? 'border-gray-700/60 shadow-lg opacity-70'
-                : 'border-gray-600/50 shadow-lg'
+                ? 'border-gray-700/50 shadow-md opacity-70'
+                : 'border-gray-500/40 shadow-md'
           } ${allowAnimation ? 'transition-colors duration-300' : ''}`}
           style={{
             width: tubeWidth,
             height: tubeHeight,
-            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05))',
+            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03))',
             backdropFilter: 'blur(10px)',
             borderWidth,
             borderStyle: 'solid'
@@ -116,8 +116,8 @@ export const Tube: React.FC<TubeProps> = ({
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
-              background: 'linear-gradient(90deg, transparent 40%, rgba(255, 255, 255, 0.1) 50%, transparent 60%)',
-              opacity: isHovered ? 0.5 : 0.3,
+              background: 'linear-gradient(90deg, transparent 45%, rgba(255, 255, 255, 0.08) 50%, transparent 65%)',
+              opacity: isHovered ? 0.45 : 0.28,
               transition: allowAnimation ? 'opacity 0.3s' : undefined
             }}
           />
@@ -131,7 +131,7 @@ export const Tube: React.FC<TubeProps> = ({
                 style={{
                   height: segmentHeight,
                   backgroundColor: segment.color,
-                  boxShadow: `inset 0 -2px 10px rgba(0, 0, 0, 0.2), 0 0 20px ${segment.color}40`,
+                  boxShadow: `inset 0 -2px 8px rgba(0, 0, 0, 0.18), 0 0 14px ${segment.color}33`,
                   borderBottom: index === 0 ? 'none' : '2px solid rgba(0, 0, 0, 0.15)'
                 }}
               >
