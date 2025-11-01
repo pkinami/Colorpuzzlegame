@@ -12,9 +12,9 @@ import { PourSystem } from '../utils/game-logic';
 import { findOptimalSolution, serializeTubes, TubeMove, SolveResult } from '../utils/solver';
 
 const MUSIC_TRACKS = [
-  '/music_effects/music_1.mp3',
-  '/music_effects/music_2.mp3',
-  '/music_effects/music_3.mp3'
+  '/music/music_1.mp3',
+  '/music/music_2.mp3',
+  '/music/music_3.mp3'
 ] as const;
 
 interface GameState {
@@ -198,8 +198,8 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     }
 
     ensureBackgroundMusic();
-    ensureAudioElement(buttonSoundRef, '/music_effects/button_press.wav', { volume: 0.6 });
-    ensureAudioElement(levelCompleteSoundRef, '/music_effects/level_completed.mp3', { volume: 0.7 });
+    ensureAudioElement(buttonSoundRef, '/music/button_press.wav', { volume: 0.6 });
+    ensureAudioElement(levelCompleteSoundRef, '/music/level_completed.mp3', { volume: 0.7 });
   }, [ensureAudioElement, ensureBackgroundMusic]);
 
   const playButtonSound = useCallback(() => {
@@ -207,7 +207,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       return;
     }
 
-    const audio = ensureAudioElement(buttonSoundRef, '/music_effects/button_press.wav', { volume: 0.6 });
+    const audio = ensureAudioElement(buttonSoundRef, '/music/button_press.wav', { volume: 0.6 });
     if (!audio) {
       return;
     }
@@ -221,7 +221,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       return;
     }
 
-    const audio = ensureAudioElement(levelCompleteSoundRef, '/music_effects/level_completed.mp3', { volume: 0.7 });
+    const audio = ensureAudioElement(levelCompleteSoundRef, '/music/level_completed.mp3', { volume: 0.7 });
     if (!audio) {
       return;
     }
