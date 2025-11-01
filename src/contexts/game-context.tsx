@@ -1,6 +1,21 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+  useCallback,
+  useRef
+} from 'react';
 import { Tube, LEVELS } from '../utils/level-data';
 import { PourSystem } from '../utils/game-logic';
+import { findOptimalSolution, serializeTubes, TubeMove, SolveResult } from '../utils/solver';
+
+const MUSIC_TRACKS = [
+  '/music_effects/music_1.mp3',
+  '/music_effects/music_2.mp3',
+  '/music_effects/music_3.mp3'
+] as const;
 
 interface GameState {
   currentLevel: number;
@@ -13,6 +28,9 @@ interface GameState {
   userProgress: { [levelId: number]: { stars: number; completed: boolean } };
   coinBalance: number;
   lastCoinsEarned: number;
+  optimalMoveCount: number | null;
+  hintMove: TubeMove | null;
+  hintsUsed: number;
 }
 
 interface GameSnapshot {
@@ -23,6 +41,7 @@ interface GameSnapshot {
   isFailed: boolean;
   selectedTube: string | null;
   lastCoinsEarned: number;
+  optimalMoveCount: number | null;
 }
 
 interface GameContextType {
@@ -33,10 +52,16 @@ interface GameContextType {
   undoMove: () => void;
   redoMove: () => void;
   setUserProgress: (progress: GameState['userProgress']) => void;
-  audioEnabled: boolean;
-  toggleAudio: () => void;
+  musicEnabled: boolean;
+  soundEnabled: boolean;
+  toggleMusic: () => void;
+  toggleSound: () => void;
   moveHistory: GameSnapshot[];
   redoHistory: GameSnapshot[];
+  requestHint: () => Promise<{ move: TubeMove | null; error?: string }>;
+  clearHint: () => void;
+  playButtonSound: () => void;
+  playLevelCompleteSound: () => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -64,29 +89,268 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     selectedTube: null,
     userProgress: {},
     coinBalance: 0,
-    lastCoinsEarned: 0
+    lastCoinsEarned: 0,
+    optimalMoveCount: null,
+    hintMove: null,
+    hintsUsed: 0
   });
 
   const [moveHistory, setMoveHistory] = useState<GameSnapshot[]>([]);
   const [redoHistory, setRedoHistory] = useState<GameSnapshot[]>([]);
-  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return true;
+    }
+    const stored = window.localStorage.getItem('crayon-sound-enabled');
+    return stored ? stored === 'true' : true;
+  });
+  const [musicEnabled, setMusicEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return true;
+    }
+    const stored = window.localStorage.getItem('crayon-music-enabled');
+    return stored ? stored === 'true' : true;
+  });
+  const backgroundMusicRef = useRef<HTMLAudioElement | null>(null);
+  const buttonSoundRef = useRef<HTMLAudioElement | null>(null);
+  const levelCompleteSoundRef = useRef<HTMLAudioElement | null>(null);
+  const initialTubesRef = useRef<Tube[]>([]);
+  const solverCacheRef = useRef<Map<string, SolveResult>>(new Map());
+  const solverTimeoutRef = useRef<number | null>(null);
 
-  const cloneTubes = useCallback((tubes: Tube[]): Tube[] =>
-    tubes.map(tube => ({
-      ...tube,
-      segments: tube.segments.map(seg => ({ ...seg })),
-      unlockCondition: tube.unlockCondition ? { ...tube.unlockCondition } : undefined
-    })), []);
+  const cloneTubes = useCallback(
+    (tubes: Tube[]): Tube[] =>
+      tubes.map(tube => ({
+        ...tube,
+        segments: tube.segments.map(seg => ({ ...seg })),
+        unlockCondition: tube.unlockCondition ? { ...tube.unlockCondition } : undefined
+      })),
+    []
+  );
 
-  const createSnapshot = useCallback((): GameSnapshot => ({
-    tubes: cloneTubes(gameState.tubes),
-    moves: gameState.moves,
-    stars: gameState.stars,
-    isComplete: gameState.isComplete,
-    isFailed: gameState.isFailed,
-    selectedTube: gameState.selectedTube,
-    lastCoinsEarned: gameState.lastCoinsEarned
-  }), [cloneTubes, gameState.isComplete, gameState.isFailed, gameState.lastCoinsEarned, gameState.moves, gameState.selectedTube, gameState.stars, gameState.tubes]);
+  const computeSolutionForTubes = useCallback(
+    (tubes: Tube[]): SolveResult => {
+      const stateKey = serializeTubes(tubes);
+      const cached = solverCacheRef.current.get(stateKey);
+      if (cached) {
+        return cached;
+      }
+
+      const cloned = cloneTubes(tubes);
+      const result = findOptimalSolution(cloned, { maxIterations: 350_000 });
+      solverCacheRef.current.set(stateKey, result);
+      return result;
+    },
+    [cloneTubes]
+  );
+
+
+  const ensureAudioElement = useCallback(
+    (
+      ref: React.MutableRefObject<HTMLAudioElement | null>,
+      src: string,
+      options: { loop?: boolean; volume?: number } = {}
+    ) => {
+      if (typeof window === 'undefined') {
+        return null;
+      }
+
+      if (!ref.current) {
+        const audio = new Audio(src);
+        audio.preload = 'auto';
+        audio.loop = Boolean(options.loop);
+        if (typeof options.volume === 'number') {
+          audio.volume = options.volume;
+        }
+        ref.current = audio;
+      } else {
+        if (typeof options.loop === 'boolean') {
+          ref.current.loop = options.loop;
+        }
+        if (typeof options.volume === 'number') {
+          ref.current.volume = options.volume;
+        }
+      }
+
+      return ref.current;
+    },
+    []
+  );
+
+  const ensureBackgroundMusic = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    const existing = backgroundMusicRef.current;
+    if (existing) {
+      return existing;
+    }
+
+    const track = MUSIC_TRACKS[Math.floor(Math.random() * MUSIC_TRACKS.length)];
+    const audio = ensureAudioElement(backgroundMusicRef, track, { loop: true, volume: 0.35 });
+    return audio;
+  }, [ensureAudioElement]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    ensureBackgroundMusic();
+    ensureAudioElement(buttonSoundRef, '/music_effects/button_press.wav', { volume: 0.6 });
+    ensureAudioElement(levelCompleteSoundRef, '/music_effects/level_completed.mp3', { volume: 0.7 });
+  }, [ensureAudioElement, ensureBackgroundMusic]);
+
+  const playButtonSound = useCallback(() => {
+    if (!soundEnabled) {
+      return;
+    }
+
+    const audio = ensureAudioElement(buttonSoundRef, '/music_effects/button_press.wav', { volume: 0.6 });
+    if (!audio) {
+      return;
+    }
+
+    audio.currentTime = 0;
+    void audio.play().catch(() => undefined);
+  }, [ensureAudioElement, soundEnabled]);
+
+  const playLevelCompleteSound = useCallback(() => {
+    if (!soundEnabled) {
+      return;
+    }
+
+    const audio = ensureAudioElement(levelCompleteSoundRef, '/music_effects/level_completed.mp3', { volume: 0.7 });
+    if (!audio) {
+      return;
+    }
+
+    audio.currentTime = 0;
+    void audio.play().catch(() => undefined);
+  }, [ensureAudioElement, soundEnabled]);
+
+  const toggleSound = useCallback(() => {
+    setSoundEnabled(prev => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('crayon-sound-enabled', String(next));
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleMusic = useCallback(() => {
+    setMusicEnabled(prev => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('crayon-music-enabled', String(next));
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const audio = ensureBackgroundMusic();
+    if (!audio) {
+      return;
+    }
+
+    audio.volume = 0.35;
+
+    if (!musicEnabled) {
+      audio.pause();
+      audio.currentTime = 0;
+      return;
+    }
+
+    const play = () => {
+      const playPromise = audio.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(() => undefined);
+      }
+    };
+
+    play();
+
+    const resumeOnInteraction = () => {
+      play();
+    };
+
+    window.addEventListener('pointerdown', resumeOnInteraction, { once: true });
+    window.addEventListener('keydown', resumeOnInteraction, { once: true });
+
+    return () => {
+      window.removeEventListener('pointerdown', resumeOnInteraction);
+      window.removeEventListener('keydown', resumeOnInteraction);
+    };
+  }, [ensureBackgroundMusic, musicEnabled]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    const handleVisibility = () => {
+      const audio = backgroundMusicRef.current;
+      if (!audio) {
+        return;
+      }
+
+      if (document.visibilityState === 'hidden') {
+        audio.pause();
+      } else if (musicEnabled) {
+        const playPromise = audio.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch(() => undefined);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [musicEnabled]);
+
+  useEffect(() => () => {
+    backgroundMusicRef.current?.pause();
+  }, []);
+
+  useEffect(() => () => {
+    if (typeof window !== 'undefined' && solverTimeoutRef.current !== null) {
+      window.clearTimeout(solverTimeoutRef.current);
+    }
+  }, []);
+
+  const createSnapshot = useCallback(
+    (): GameSnapshot => ({
+      tubes: cloneTubes(gameState.tubes),
+      moves: gameState.moves,
+      stars: gameState.stars,
+      isComplete: gameState.isComplete,
+      isFailed: gameState.isFailed,
+      selectedTube: gameState.selectedTube,
+      lastCoinsEarned: gameState.lastCoinsEarned,
+      optimalMoveCount: gameState.optimalMoveCount
+    }),
+    [
+      cloneTubes,
+      gameState.isComplete,
+      gameState.isFailed,
+      gameState.lastCoinsEarned,
+      gameState.moves,
+      gameState.optimalMoveCount,
+      gameState.selectedTube,
+      gameState.stars,
+      gameState.tubes
+    ]
+  );
 
   const shuffle = <T,>(items: T[]): T[] => {
     const copy = [...items];
@@ -146,6 +410,15 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       });
     }
 
+    const initialClone = cloneTubes(preparedTubes);
+
+    if (typeof window !== 'undefined' && solverTimeoutRef.current) {
+      window.clearTimeout(solverTimeoutRef.current);
+      solverTimeoutRef.current = null;
+    }
+
+    initialTubesRef.current = initialClone;
+
     setGameState(prev => ({
       currentLevel: levelId,
       tubes: preparedTubes,
@@ -156,11 +429,42 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       selectedTube: null,
       userProgress: prev.userProgress,
       coinBalance: prev.coinBalance,
-      lastCoinsEarned: 0
+      lastCoinsEarned: 0,
+      optimalMoveCount: null,
+      hintMove: null,
+      hintsUsed: 0
     }));
 
     setMoveHistory([]);
     setRedoHistory([]);
+
+    const scheduleCalculation = () => {
+      if (typeof window !== 'undefined') {
+        solverTimeoutRef.current = null;
+      }
+      const solution = computeSolutionForTubes(initialClone);
+      setGameState(prev => {
+        if (prev.currentLevel !== levelId) {
+          return prev;
+        }
+
+        if (!solution.solved) {
+          return { ...prev, optimalMoveCount: null };
+        }
+
+        if (prev.optimalMoveCount === solution.moves.length) {
+          return prev;
+        }
+
+        return { ...prev, optimalMoveCount: solution.moves.length };
+      });
+    };
+
+    if (typeof window !== 'undefined') {
+      solverTimeoutRef.current = window.setTimeout(scheduleCalculation, 40);
+    } else {
+      scheduleCalculation();
+    }
   };
 
   const selectTube = (tubeId: string) => {
@@ -216,23 +520,24 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       const isComplete = PourSystem.isLevelComplete(updatedTubes);
       let starsEarned = 0;
       let coinsEarned = 0;
+      let optimalFromStart: number | null = null;
 
       if (isComplete) {
         const level = LEVELS.find(l => l.id === gameState.currentLevel);
         if (level) {
           starsEarned = PourSystem.calculateStars(newMoves, 0, level.starThresholds);
-          const minimumMoves = Math.max(0, level.starThresholds.five.moves);
-          const extraMoves = Math.max(0, newMoves - minimumMoves);
+          const initialLevelSolution = initialTubesRef.current.length
+            ? computeSolutionForTubes(initialTubesRef.current)
+            : null;
 
-          if (extraMoves === 0) {
-            coinsEarned = 100;
-          } else if (extraMoves >= 10) {
-            coinsEarned = 10;
-          } else if (extraMoves >= 9) {
-            coinsEarned = 20;
-          } else {
-            coinsEarned = Math.max(10, 100 - extraMoves * 10);
+          if (initialLevelSolution && initialLevelSolution.solved) {
+            optimalFromStart = initialLevelSolution.moves.length;
           }
+
+          const baselineMoves = optimalFromStart ?? Math.max(0, level.starThresholds.five.moves);
+          const moveGap = Math.max(0, newMoves - baselineMoves);
+          const diamondScore = Math.max(1, Math.min(10, 10 - moveGap));
+          coinsEarned = diamondScore;
 
           // Update progress
           const updatedProgress = { ...gameState.userProgress };
@@ -240,7 +545,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
             updatedProgress[gameState.currentLevel] = { stars: starsEarned, completed: true };
           }
 
-          const updatedCoinBalance = gameState.coinBalance + coinsEarned;
+          const updatedCoinBalance = Math.max(0, Math.min(9999, gameState.coinBalance + coinsEarned));
 
           setGameState(prev => ({
             ...prev,
@@ -252,7 +557,10 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
             selectedTube: null,
             userProgress: updatedProgress,
             coinBalance: updatedCoinBalance,
-            lastCoinsEarned: coinsEarned
+            lastCoinsEarned: coinsEarned,
+            hintMove: null,
+            optimalMoveCount: optimalFromStart ?? prev.optimalMoveCount,
+            hintsUsed: prev.hintsUsed
           }));
 
           localStorage.setItem('crayon-progress', JSON.stringify(updatedProgress));
@@ -267,12 +575,11 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         moves: newMoves,
         isComplete,
         isFailed: false,
-        selectedTube: null
+        selectedTube: null,
+        hintMove: null
       }));
 
-      if (audioEnabled) {
-        playPourSound();
-      }
+      playPourSound();
     } else {
       // Invalid move, just deselect
       setGameState(prev => ({ ...prev, selectedTube: null }));
@@ -282,6 +589,89 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   const resetLevel = () => {
     startLevel(gameState.currentLevel);
   };
+
+  const clearHint = useCallback(() => {
+    setGameState(prev => {
+      if (!prev.hintMove) {
+        return prev;
+      }
+      return { ...prev, hintMove: null };
+    });
+  }, []);
+
+  const requestHint = useCallback(async (): Promise<{ move: TubeMove | null; error?: string }> => {
+    if (gameState.isComplete || gameState.isFailed) {
+      return { move: null };
+    }
+
+    if (gameState.hintsUsed >= 3) {
+      return { move: null, error: 'You have depleted hints in this level.' };
+    }
+
+    if (gameState.coinBalance < 5) {
+      return { move: null, error: 'Not enough diamonds for a hint.' };
+    }
+
+    const tubesSnapshot = cloneTubes(gameState.tubes);
+    const currentLevel = gameState.currentLevel;
+
+    const computeHint = () => {
+      const solution = computeSolutionForTubes(tubesSnapshot);
+
+      if (solution.solved && solution.moves.length > 0) {
+        const nextMove = solution.moves[0];
+        let updatedBalance: number | null = null;
+
+        setGameState(prev => {
+          if (prev.currentLevel !== currentLevel || prev.coinBalance < 5 || prev.hintsUsed >= 3) {
+            return prev;
+          }
+
+          const balance = Math.max(0, prev.coinBalance - 5);
+          const hintsUsed = prev.hintsUsed + 1;
+          const nextState: GameState = {
+            ...prev,
+            hintMove: nextMove,
+            coinBalance: balance,
+            hintsUsed
+          };
+
+          if (prev.optimalMoveCount == null && solution.solved) {
+            nextState.optimalMoveCount = solution.moves.length;
+          }
+
+          updatedBalance = balance;
+          return nextState;
+        });
+
+        if (updatedBalance !== null) {
+          localStorage.setItem('crayon-coin-balance', JSON.stringify(updatedBalance));
+        }
+
+        return { move: nextMove };
+      }
+
+      setGameState(prev => {
+        if (prev.currentLevel !== currentLevel) {
+          return prev;
+        }
+        if (prev.hintMove === null) {
+          return prev;
+        }
+        return { ...prev, hintMove: null };
+      });
+
+      return { move: null, error: 'No hint available right now. Try a different pour!' };
+    };
+
+    if (typeof window !== 'undefined') {
+      return new Promise(resolve => {
+        window.setTimeout(() => resolve(computeHint()), 0);
+      });
+    }
+
+    return Promise.resolve(computeHint());
+  }, [cloneTubes, computeSolutionForTubes, gameState.coinBalance, gameState.currentLevel, gameState.hintsUsed, gameState.isComplete, gameState.isFailed, gameState.tubes]);
 
   const undoMove = () => {
     if (moveHistory.length === 0) return;
@@ -300,7 +690,9 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       isComplete: previousSnapshot.isComplete,
       isFailed: previousSnapshot.isFailed,
       selectedTube: null,
-      lastCoinsEarned: previousSnapshot.lastCoinsEarned
+      lastCoinsEarned: previousSnapshot.lastCoinsEarned,
+      optimalMoveCount: previousSnapshot.optimalMoveCount ?? prev.optimalMoveCount,
+      hintMove: null
     }));
   };
 
@@ -320,12 +712,10 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       isComplete: nextSnapshot.isComplete,
       isFailed: nextSnapshot.isFailed,
       selectedTube: null,
-      lastCoinsEarned: nextSnapshot.lastCoinsEarned
+      lastCoinsEarned: nextSnapshot.lastCoinsEarned,
+      optimalMoveCount: nextSnapshot.optimalMoveCount ?? prev.optimalMoveCount,
+      hintMove: null
     }));
-  };
-
-  const toggleAudio = () => {
-    setAudioEnabled(prev => !prev);
   };
 
   // Load progress from localStorage on mount
@@ -356,6 +746,10 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   }, []);
 
   const playPourSound = () => {
+    if (!soundEnabled) {
+      return;
+    }
+
     // Simple sound effect using Web Audio API
     try {
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -388,10 +782,16 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         undoMove,
         redoMove,
         setUserProgress,
-        audioEnabled,
-        toggleAudio,
+        musicEnabled,
+        soundEnabled,
+        toggleMusic,
+        toggleSound,
         moveHistory,
-        redoHistory
+        redoHistory,
+        requestHint,
+        clearHint,
+        playButtonSound,
+        playLevelCompleteSound
       }}
     >
       {children}
