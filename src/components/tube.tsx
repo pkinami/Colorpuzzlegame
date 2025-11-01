@@ -96,7 +96,7 @@ export const Tube: React.FC<TubeProps> = ({
         )}
 
         <div
-          className={`relative rounded-b-3xl overflow-hidden ${
+          className={`relative ${
             isSelected
               ? 'border-cyan-400 shadow-xl shadow-cyan-500/50'
               : isDisabled
@@ -106,18 +106,26 @@ export const Tube: React.FC<TubeProps> = ({
           style={{
             width: tubeWidth,
             height: tubeHeight,
-            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03))',
+            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04))',
             backdropFilter: 'blur(10px)',
             borderWidth,
-            borderStyle: 'solid'
+            borderStyle: 'solid',
+            borderTopLeftRadius: tubeWidth * 0.28,
+            borderTopRightRadius: tubeWidth * 0.28,
+            borderBottomLeftRadius: tubeWidth * 0.8,
+            borderBottomRightRadius: tubeWidth * 0.8,
+            boxShadow: isSelected
+              ? '0 20px 40px rgba(56, 189, 248, 0.35)'
+              : '0 18px 36px rgba(0, 0, 0, 0.45)',
+            overflow: 'visible'
           }}
         >
           {/* Glass reflection effect */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
-              background: 'linear-gradient(90deg, transparent 45%, rgba(255, 255, 255, 0.08) 50%, transparent 65%)',
-              opacity: isHovered ? 0.45 : 0.28,
+              background: 'linear-gradient(95deg, transparent 40%, rgba(255, 255, 255, 0.1) 52%, transparent 65%)',
+              opacity: isHovered ? 0.52 : 0.34,
               transition: allowAnimation ? 'opacity 0.3s' : undefined
             }}
           />
@@ -130,9 +138,9 @@ export const Tube: React.FC<TubeProps> = ({
                 className="w-full relative transition-transform duration-200"
                 style={{
                   height: segmentHeight,
-                  backgroundColor: segment.color,
-                  boxShadow: `inset 0 -2px 8px rgba(0, 0, 0, 0.18), 0 0 14px ${segment.color}33`,
-                  borderBottom: index === 0 ? 'none' : '2px solid rgba(0, 0, 0, 0.15)'
+                  background: `linear-gradient(180deg, ${segment.color} 0%, ${segment.color}CC 55%, ${segment.color}AA 100%)`,
+                  boxShadow: `inset 0 -4px 10px rgba(0, 0, 0, 0.25), 0 0 22px ${segment.color}4D`,
+                  borderBottom: index === 0 ? 'none' : '2px solid rgba(0, 0, 0, 0.2)'
                 }}
               >
                 {/* Liquid shimmer effect */}
@@ -140,10 +148,10 @@ export const Tube: React.FC<TubeProps> = ({
                   <motion.div
                     className="absolute inset-0"
                     style={{
-                      background: `linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, transparent 50%, rgba(0, 0, 0, 0.1) 100%)`
+                      background: `linear-gradient(180deg, rgba(255, 255, 255, 0.38) 0%, transparent 55%, rgba(0, 0, 0, 0.18) 100%)`
                     }}
                     animate={{
-                      opacity: [0.3, 0.6, 0.3]
+                      opacity: [0.45, 0.7, 0.45]
                     }}
                     transition={{
                       duration: 2,
@@ -166,7 +174,7 @@ export const Tube: React.FC<TubeProps> = ({
                     <motion.div
                       className="absolute top-0 left-0 right-0 h-1"
                       style={{
-                        background: `linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent)`
+                        background: `linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent)`
                       }}
                       animate={{
                         x: [-20, 20, -20]
@@ -181,7 +189,7 @@ export const Tube: React.FC<TubeProps> = ({
                     <div
                       className="absolute top-0 left-0 right-0 h-1"
                       style={{
-                        background: `linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent)`
+                        background: `linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent)`
                       }}
                     />
                   )
@@ -189,6 +197,19 @@ export const Tube: React.FC<TubeProps> = ({
               </div>
             ))}
           </div>
+
+          {/* Rounded base highlight */}
+          <div
+            className="absolute left-1/2 -translate-x-1/2"
+            style={{
+              bottom: -Math.max(10, 12 * scaleFactor),
+              width: tubeWidth * 0.82,
+              height: Math.max(14, 18 * scaleFactor),
+              background: 'radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.3), rgba(34, 197, 94, 0) 70%)',
+              borderRadius: tubeWidth,
+              boxShadow: '0 16px 20px rgba(0, 0, 0, 0.45)'
+            }}
+          />
 
           {/* Tube neck (top opening) */}
           <div
@@ -198,7 +219,7 @@ export const Tube: React.FC<TubeProps> = ({
             style={{
               width: neckWidth,
               height: neckHeight,
-              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05))',
+              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08))',
               backdropFilter: 'blur(10px)',
               borderWidth,
               borderStyle: 'solid',
