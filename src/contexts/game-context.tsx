@@ -30,6 +30,7 @@ interface GameState {
   lastCoinsEarned: number;
   optimalMoveCount: number | null;
   hintMove: TubeMove | null;
+  hintsUsed: number;
 }
 
 interface GameSnapshot {
@@ -57,7 +58,7 @@ interface GameContextType {
   toggleSound: () => void;
   moveHistory: GameSnapshot[];
   redoHistory: GameSnapshot[];
-  requestHint: () => Promise<TubeMove | null>;
+  requestHint: () => Promise<{ move: TubeMove | null; error?: string }>;
   clearHint: () => void;
   playButtonSound: () => void;
   playLevelCompleteSound: () => void;
@@ -90,7 +91,8 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     coinBalance: 0,
     lastCoinsEarned: 0,
     optimalMoveCount: null,
-    hintMove: null
+    hintMove: null,
+    hintsUsed: 0
   });
 
   const [moveHistory, setMoveHistory] = useState<GameSnapshot[]>([]);
@@ -391,7 +393,8 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       coinBalance: prev.coinBalance,
       lastCoinsEarned: 0,
       optimalMoveCount: null,
-      hintMove: null
+      hintMove: null,
+      hintsUsed: 0
     }));
 
     setMoveHistory([]);
@@ -479,23 +482,24 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       const isComplete = PourSystem.isLevelComplete(updatedTubes);
       let starsEarned = 0;
       let coinsEarned = 0;
+      let optimalFromStart: number | null = null;
 
       if (isComplete) {
         const level = LEVELS.find(l => l.id === gameState.currentLevel);
         if (level) {
           starsEarned = PourSystem.calculateStars(newMoves, 0, level.starThresholds);
-          const minimumMoves = Math.max(0, level.starThresholds.five.moves);
-          const extraMoves = Math.max(0, newMoves - minimumMoves);
+          const initialSolution = initialTubesRef.current.length
+            ? computeSolutionForTubes(initialTubesRef.current)
+            : null;
 
-          if (extraMoves === 0) {
-            coinsEarned = 100;
-          } else if (extraMoves >= 10) {
-            coinsEarned = 10;
-          } else if (extraMoves >= 9) {
-            coinsEarned = 20;
-          } else {
-            coinsEarned = Math.max(10, 100 - extraMoves * 10);
+          if (initialSolution && initialSolution.solved) {
+            optimalFromStart = initialSolution.moves.length;
           }
+
+          const baselineMoves = optimalFromStart ?? Math.max(0, level.starThresholds.five.moves);
+          const moveGap = Math.max(0, newMoves - baselineMoves);
+          const diamondScore = Math.max(1, Math.min(10, 10 - moveGap));
+          coinsEarned = diamondScore;
 
           // Update progress
           const updatedProgress = { ...gameState.userProgress };
@@ -503,7 +507,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
             updatedProgress[gameState.currentLevel] = { stars: starsEarned, completed: true };
           }
 
-          const updatedCoinBalance = gameState.coinBalance + coinsEarned;
+          const updatedCoinBalance = Math.max(0, Math.min(9999, gameState.coinBalance + coinsEarned));
 
           const initialSolution = initialTubesRef.current.length
             ? computeSolutionForTubes(initialTubesRef.current)
@@ -524,7 +528,8 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
             coinBalance: updatedCoinBalance,
             lastCoinsEarned: coinsEarned,
             hintMove: null,
-            optimalMoveCount: optimalFromStart ?? prev.optimalMoveCount
+            optimalMoveCount: optimalFromStart ?? prev.optimalMoveCount,
+            hintsUsed: prev.hintsUsed
           }));
 
           localStorage.setItem('crayon-progress', JSON.stringify(updatedProgress));
@@ -563,9 +568,17 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     });
   }, []);
 
-  const requestHint = useCallback(async (): Promise<TubeMove | null> => {
+  const requestHint = useCallback(async (): Promise<{ move: TubeMove | null; error?: string }> => {
     if (gameState.isComplete || gameState.isFailed) {
-      return null;
+      return { move: null };
+    }
+
+    if (gameState.hintsUsed >= 3) {
+      return { move: null, error: 'You have depleted hints in this level.' };
+    }
+
+    if (gameState.coinBalance < 5) {
+      return { move: null, error: 'Not enough diamonds for a hint.' };
     }
 
     const tubesSnapshot = cloneTubes(gameState.tubes);
@@ -576,18 +589,35 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
       if (solution.solved && solution.moves.length > 0) {
         const nextMove = solution.moves[0];
+        let updatedBalance: number | null = null;
+
         setGameState(prev => {
-          if (prev.currentLevel !== currentLevel) {
+          if (prev.currentLevel !== currentLevel || prev.coinBalance < 5 || prev.hintsUsed >= 3) {
             return prev;
           }
 
-          const nextState: GameState = { ...prev, hintMove: nextMove };
+          const balance = Math.max(0, prev.coinBalance - 5);
+          const hintsUsed = prev.hintsUsed + 1;
+          const nextState: GameState = {
+            ...prev,
+            hintMove: nextMove,
+            coinBalance: balance,
+            hintsUsed
+          };
+
           if (prev.optimalMoveCount == null && solution.solved) {
             nextState.optimalMoveCount = solution.moves.length;
           }
+
+          updatedBalance = balance;
           return nextState;
         });
-        return nextMove;
+
+        if (updatedBalance !== null) {
+          localStorage.setItem('crayon-coin-balance', JSON.stringify(updatedBalance));
+        }
+
+        return { move: nextMove };
       }
 
       setGameState(prev => {
@@ -600,17 +630,17 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         return { ...prev, hintMove: null };
       });
 
-      return null;
+      return { move: null, error: 'No hint available right now. Try a different pour!' };
     };
 
     if (typeof window !== 'undefined') {
-      return new Promise<TubeMove | null>(resolve => {
+      return new Promise(resolve => {
         window.setTimeout(() => resolve(computeHint()), 0);
       });
     }
 
     return Promise.resolve(computeHint());
-  }, [cloneTubes, computeSolutionForTubes, gameState.currentLevel, gameState.isComplete, gameState.isFailed, gameState.tubes]);
+  }, [cloneTubes, computeSolutionForTubes, gameState.coinBalance, gameState.currentLevel, gameState.hintsUsed, gameState.isComplete, gameState.isFailed, gameState.tubes]);
 
   const undoMove = () => {
     if (moveHistory.length === 0) return;

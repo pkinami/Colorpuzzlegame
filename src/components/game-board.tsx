@@ -105,6 +105,10 @@ export const GameBoard: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHintLoading, setIsHintLoading] = useState(false);
   const [hintFeedback, setHintFeedback] = useState<string | null>(null);
+  const [fewestMessage, setFewestMessage] = useState<string | null>(null);
+  const fewestMessageTimeout = useRef<number | null>(null);
+  const hintTimeoutRef = useRef<number | null>(null);
+  const fewestShownRef = useRef(false);
 
   useEffect(() => {
     if (gameState.isComplete) {
@@ -208,11 +212,46 @@ export const GameBoard: React.FC = () => {
     return `Used ${gameState.moves} moves`;
   }, [gameState.moves, gameState.optimalMoveCount]);
 
-  const diamondBalance = useMemo(() => Math.max(0, Math.round(gameState.coinBalance)), [gameState.coinBalance]);
-  const bestMoveTarget = gameState.optimalMoveCount ?? '--';
+  const diamondBalance = useMemo(
+    () => Math.max(0, Math.min(9999, Math.floor(gameState.coinBalance))),
+    [gameState.coinBalance]
+  );
+  const hintsRemaining = Math.max(0, 3 - gameState.hintsUsed);
   const canUndo = moveHistory.length > 0;
   const hintBannerVisible = isHintLoading || Boolean(hintFeedback);
   const hintMove = gameState.hintMove;
+
+  const showFewestMovesMessage = useCallback(
+    (message: string) => {
+      setFewestMessage(message);
+      if (typeof window !== 'undefined') {
+        if (fewestMessageTimeout.current) {
+          window.clearTimeout(fewestMessageTimeout.current);
+        }
+        fewestMessageTimeout.current = window.setTimeout(() => {
+          setFewestMessage(null);
+          fewestMessageTimeout.current = null;
+        }, 3200);
+      }
+    },
+    []
+  );
+
+  const handleTubeSelect = useCallback(
+    (tubeId: string) => {
+      if (!fewestShownRef.current) {
+        fewestShownRef.current = true;
+        if (gameState.optimalMoveCount != null) {
+          showFewestMovesMessage(`Fewest moves: ${gameState.optimalMoveCount}`);
+        } else {
+          showFewestMovesMessage('Calculating fewest moves…');
+        }
+      }
+
+      selectTube(tubeId);
+    },
+    [gameState.optimalMoveCount, selectTube, showFewestMovesMessage]
+  );
 
   const handleUndo = useCallback(() => {
     if (!canUndo) {
@@ -272,11 +311,13 @@ export const GameBoard: React.FC = () => {
     setIsHintLoading(true);
     playButtonSound();
 
-    const move = await requestHint();
-    if (move) {
-      const fromIndex = (tubeIndexMap.get(move.fromTubeId) ?? 0) + 1;
-      const toIndex = (tubeIndexMap.get(move.toTubeId) ?? 0) + 1;
+    const result = await requestHint();
+    if (result.move) {
+      const fromIndex = (tubeIndexMap.get(result.move.fromTubeId) ?? 0) + 1;
+      const toIndex = (tubeIndexMap.get(result.move.toTubeId) ?? 0) + 1;
       setHintFeedback(`Next move: Tube ${fromIndex} → Tube ${toIndex}`);
+    } else if (result.error) {
+      setHintFeedback(result.error);
     } else {
       setHintFeedback('No hint available right now. Try a different pour!');
     }
@@ -284,20 +325,89 @@ export const GameBoard: React.FC = () => {
     setIsHintLoading(false);
   }, [clearHint, gameState.isComplete, isHintLoading, playButtonSound, requestHint, tubeIndexMap]);
 
+  useEffect(() => {
+    if (fewestShownRef.current && gameState.optimalMoveCount != null && fewestMessage === 'Calculating fewest moves…') {
+      showFewestMovesMessage(`Fewest moves: ${gameState.optimalMoveCount}`);
+    }
+  }, [fewestMessage, gameState.optimalMoveCount, showFewestMovesMessage]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    return () => {
+      if (fewestMessageTimeout.current) {
+        window.clearTimeout(fewestMessageTimeout.current);
+        fewestMessageTimeout.current = null;
+      }
+      if (hintTimeoutRef.current) {
+        window.clearTimeout(hintTimeoutRef.current);
+        hintTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hintFeedback || isHintLoading) {
+      return;
+    }
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (hintTimeoutRef.current) {
+      window.clearTimeout(hintTimeoutRef.current);
+    }
+
+    hintTimeoutRef.current = window.setTimeout(() => {
+      setHintFeedback(null);
+      hintTimeoutRef.current = null;
+    }, 3600);
+  }, [hintFeedback, isHintLoading]);
+
+  useEffect(() => {
+    fewestShownRef.current = false;
+    setFewestMessage(null);
+    setHintFeedback(null);
+    if (typeof window !== 'undefined' && hintTimeoutRef.current) {
+      window.clearTimeout(hintTimeoutRef.current);
+      hintTimeoutRef.current = null;
+    }
+  }, [gameState.currentLevel]);
+
+  useEffect(() => {
+    if (
+      gameState.moves === 0 &&
+      !gameState.isComplete &&
+      !gameState.isFailed &&
+      moveHistory.length === 0
+    ) {
+      fewestShownRef.current = false;
+      setFewestMessage(null);
+    }
+  }, [gameState.isComplete, gameState.isFailed, gameState.moves, moveHistory.length]);
+
   return (
     <div className="gameboard" style={boardBackgroundStyle}>
       <header className="gameboard__header">
         <div className="gameboard__header-inner">
           <div className="gameboard__header-top">
-            <button className="gameboard__diamond-button" type="button">
-              <div className="gameboard__diamond-icon-wrapper">
-                <img src="/icons/diamond.png" alt="Diamonds icon" className="gameboard__diamond-icon" />
-              </div>
-              <div className="gameboard__diamond-content">
-                <span className="gameboard__diamond-label">Diamonds</span>
+            <div className="gameboard__top-group">
+              <div className="gameboard__top-chip" aria-label="Diamonds available">
+                <img src="/icons/diamond.png" alt="" className="gameboard__diamond-icon" />
                 <span className="gameboard__diamond-value">{diamondBalance}</span>
               </div>
-            </button>
+              <div className="gameboard__top-stat">
+                <span className="gameboard__top-stat-label">Level</span>
+                <span className="gameboard__top-stat-value">Lv.{currentLevel?.id ?? '--'}</span>
+              </div>
+              <div className="gameboard__top-stat">
+                <span className="gameboard__top-stat-label">Moves</span>
+                <span className="gameboard__top-stat-value">{gameState.moves}</span>
+              </div>
+            </div>
             <button
               type="button"
               className="gameboard__settings-button"
@@ -307,28 +417,31 @@ export const GameBoard: React.FC = () => {
               <img src="/icons/settings.png" alt="Settings" className="gameboard__settings-icon" />
             </button>
           </div>
-          <div className="gameboard__stats-row">
-            <div className="gameboard__stat-block">
-              <span className="gameboard__stat-label">Level</span>
-              <span className="gameboard__stat-value">Lv.{currentLevel?.id ?? '--'}</span>
-            </div>
-            <div className="gameboard__stat-block">
-              <span className="gameboard__stat-label">Moves</span>
-              <span className="gameboard__stat-value">{gameState.moves}</span>
-            </div>
-            <div className="gameboard__stat-block gameboard__stat-block--accent">
-              <span className="gameboard__stat-label">Fewest</span>
-              <span className="gameboard__stat-value">{bestMoveTarget}</span>
-              <span className="gameboard__stat-helper">Calculated path</span>
-            </div>
-          </div>
         </div>
       </header>
 
-      {hintBannerVisible && (
-        <div className="gameboard__hint-banner">
-          <img src="/icons/hint.png" alt="Hint" className="gameboard__hint-icon" />
-          <span>{isHintLoading ? 'Calculating the best move…' : hintFeedback}</span>
+      {(fewestMessage || hintBannerVisible) && (
+        <div className="gameboard__floating-container" aria-live="polite">
+          {fewestMessage && (
+            <div className={clsx('gameboard__floating-banner', 'gameboard__floating-banner--fewest', {
+              'gameboard__floating-banner--visible': Boolean(fewestMessage)
+            })}
+            >
+              <img src="/icons/hint.png" alt="" className="gameboard__floating-icon" />
+              <span>{fewestMessage}</span>
+            </div>
+          )}
+          {hintBannerVisible && (
+            <div
+              className={clsx('gameboard__floating-banner', 'gameboard__floating-banner--hint', {
+                'gameboard__floating-banner--visible': hintBannerVisible,
+                'gameboard__floating-banner--loading': isHintLoading
+              })}
+            >
+              <img src="/icons/hint.png" alt="Hint" className="gameboard__floating-icon" />
+              <span>{isHintLoading ? 'Calculating the best move…' : hintFeedback}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -346,7 +459,7 @@ export const GameBoard: React.FC = () => {
                 <Tube
                   tube={tube}
                   isSelected={gameState.selectedTube === tube.id}
-                  onSelect={() => selectTube(tube.id)}
+                  onSelect={() => handleTubeSelect(tube.id)}
                   scale={tubeScale}
                   heightScale={heightScale}
                   reduceMotion={reduceTubeMotion}
@@ -381,7 +494,7 @@ export const GameBoard: React.FC = () => {
             >
               <img src="/icons/hint.png" alt="Hint" className="gameboard__action-icon" />
             </button>
-            <span className="gameboard__action-label">Hint</span>
+            <span className="gameboard__action-label">Hint x{hintsRemaining}</span>
           </div>
           <div className="gameboard__control">
             <button
