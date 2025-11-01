@@ -1,6 +1,26 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+  useCallback,
+  useRef
+} from 'react';
 import { Tube, LEVELS } from '../utils/level-data';
 import { PourSystem } from '../utils/game-logic';
+import {
+  MUSIC_TRACK_DATA_URIS,
+  BUTTON_SOUND_DATA_URI,
+  LEVEL_COMPLETE_SOUND_DATA_URI
+} from '../assets/audio-data';
+
+const musicTrack1 = MUSIC_TRACK_DATA_URIS[0] ?? '';
+const musicTrack2 = MUSIC_TRACK_DATA_URIS[1] ?? MUSIC_TRACK_DATA_URIS[0] ?? '';
+const musicTrack3 =
+  MUSIC_TRACK_DATA_URIS[2] ?? MUSIC_TRACK_DATA_URIS[1] ?? MUSIC_TRACK_DATA_URIS[0] ?? '';
+const buttonPressSound = BUTTON_SOUND_DATA_URI;
+const levelCompletedSound = LEVEL_COMPLETE_SOUND_DATA_URI;
 
 interface GameState {
   currentLevel: number;
@@ -35,11 +55,25 @@ interface GameContextType {
   setUserProgress: (progress: GameState['userProgress']) => void;
   audioEnabled: boolean;
   toggleAudio: () => void;
+  soundEnabled: boolean;
+  musicEnabled: boolean;
+  toggleSound: () => void;
+  toggleMusic: () => void;
+  playButtonSound: () => void;
+  playLevelCompleteSound: () => void;
   moveHistory: GameSnapshot[];
   redoHistory: GameSnapshot[];
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
+
+const SOUND_STORAGE_KEY = 'crayon-sound-enabled';
+const MUSIC_STORAGE_KEY = 'crayon-music-enabled';
+const MUSIC_TRACK_SOURCES = [musicTrack1, musicTrack2, musicTrack3].filter(
+  (track): track is string => Boolean(track)
+);
+const BUTTON_SOUND_SOURCE = buttonPressSound;
+const LEVEL_COMPLETE_SOUND_SOURCE = levelCompletedSound;
 
 export const useGame = () => {
   const context = useContext(GameContext);
@@ -69,7 +103,74 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
   const [moveHistory, setMoveHistory] = useState<GameSnapshot[]>([]);
   const [redoHistory, setRedoHistory] = useState<GameSnapshot[]>([]);
-  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [musicEnabled, setMusicEnabled] = useState(true);
+  const backgroundTracksRef = useRef<HTMLAudioElement[]>([]);
+  const buttonSoundRef = useRef<HTMLAudioElement | null>(null);
+  const levelCompleteRef = useRef<HTMLAudioElement | null>(null);
+  const currentTrackIndexRef = useRef(0);
+  const resumeOnInteractionRef = useRef<(() => void) | null>(null);
+  const musicEnabledRef = useRef(musicEnabled);
+
+  const releasePendingInteraction = useCallback(() => {
+    if (resumeOnInteractionRef.current) {
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('pointerdown', resumeOnInteractionRef.current);
+      }
+      resumeOnInteractionRef.current = null;
+    }
+  }, []);
+
+  const playBackgroundTrack = useCallback(
+    (index: number) => {
+      const tracks = backgroundTracksRef.current;
+      if (tracks.length === 0) {
+        return;
+      }
+
+      const safeIndex = ((index % tracks.length) + tracks.length) % tracks.length;
+      currentTrackIndexRef.current = safeIndex;
+
+      tracks.forEach((track, trackIndex) => {
+        if (trackIndex !== safeIndex) {
+          track.pause();
+          try {
+            track.currentTime = 0;
+          } catch (error) {
+            // Ignore errors when resetting currentTime on certain browsers
+          }
+        }
+      });
+
+      const targetTrack = tracks[safeIndex];
+      if (!musicEnabledRef.current) {
+        return;
+      }
+
+      const playPromise = targetTrack.play();
+
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(() => {
+          if (typeof document === 'undefined') {
+            return;
+          }
+
+          releasePendingInteraction();
+
+          const handler = () => {
+            releasePendingInteraction();
+            targetTrack.play().catch(() => {
+              // Swallow play rejection to avoid noisy errors
+            });
+          };
+
+          resumeOnInteractionRef.current = handler;
+          document.addEventListener('pointerdown', handler, { once: true });
+        });
+      }
+    },
+    [releasePendingInteraction]
+  );
 
   const cloneTubes = useCallback((tubes: Tube[]): Tube[] =>
     tubes.map(tube => ({
@@ -270,7 +371,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         selectedTube: null
       }));
 
-      if (audioEnabled) {
+      if (soundEnabled) {
         playPourSound();
       }
     } else {
@@ -325,8 +426,65 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   };
 
   const toggleAudio = () => {
-    setAudioEnabled(prev => !prev);
+    setSoundEnabled(prev => {
+      const next = !prev;
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(SOUND_STORAGE_KEY, JSON.stringify(next));
+        }
+      } catch (error) {
+        // Ignore persistence errors
+      }
+      return next;
+    });
   };
+
+  const toggleSound = () => {
+    toggleAudio();
+  };
+
+  const toggleMusic = () => {
+    setMusicEnabled(prev => {
+      const next = !prev;
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(MUSIC_STORAGE_KEY, JSON.stringify(next));
+        }
+      } catch (error) {
+        // Ignore persistence errors
+      }
+      return next;
+    });
+  };
+
+  const audioEnabled = soundEnabled;
+
+  useEffect(() => {
+    if (typeof localStorage === 'undefined') {
+      return;
+    }
+
+    try {
+      const storedSound = localStorage.getItem(SOUND_STORAGE_KEY);
+      if (storedSound !== null) {
+        const parsed = JSON.parse(storedSound);
+        if (typeof parsed === 'boolean') {
+          setSoundEnabled(parsed);
+        }
+      }
+
+      const storedMusic = localStorage.getItem(MUSIC_STORAGE_KEY);
+      if (storedMusic !== null) {
+        const parsed = JSON.parse(storedMusic);
+        if (typeof parsed === 'boolean') {
+          setMusicEnabled(parsed);
+          musicEnabledRef.current = parsed;
+        }
+      }
+    } catch (error) {
+      // Ignore read errors and fall back to defaults
+    }
+  }, []);
 
   // Load progress from localStorage on mount
   useEffect(() => {
@@ -354,6 +512,117 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       }
     }
   }, []);
+
+  useEffect(() => {
+    musicEnabledRef.current = musicEnabled;
+
+    if (!musicEnabled) {
+      backgroundTracksRef.current.forEach(track => {
+        track.pause();
+      });
+      releasePendingInteraction();
+    } else {
+      playBackgroundTrack(currentTrackIndexRef.current);
+    }
+  }, [musicEnabled, playBackgroundTrack, releasePendingInteraction]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof Audio === 'undefined') {
+      return;
+    }
+
+    if (MUSIC_TRACK_SOURCES.length === 0) {
+      return;
+    }
+
+    const tracks = MUSIC_TRACK_SOURCES.map(source => {
+      const audio = new Audio(source);
+      audio.loop = false;
+      audio.preload = 'auto';
+      audio.volume = 0.4;
+      return audio;
+    });
+
+    const handleTrackEnded = () => {
+      playBackgroundTrack(currentTrackIndexRef.current + 1);
+    };
+
+    tracks.forEach(track => {
+      track.addEventListener('ended', handleTrackEnded);
+    });
+
+    backgroundTracksRef.current = tracks;
+
+    if (BUTTON_SOUND_SOURCE) {
+      buttonSoundRef.current = new Audio(BUTTON_SOUND_SOURCE);
+      buttonSoundRef.current.preload = 'auto';
+      buttonSoundRef.current.volume = 0.7;
+    } else {
+      buttonSoundRef.current = null;
+    }
+
+    if (LEVEL_COMPLETE_SOUND_SOURCE) {
+      levelCompleteRef.current = new Audio(LEVEL_COMPLETE_SOUND_SOURCE);
+      levelCompleteRef.current.preload = 'auto';
+      levelCompleteRef.current.volume = 0.75;
+    } else {
+      levelCompleteRef.current = null;
+    }
+
+    if (musicEnabledRef.current) {
+      playBackgroundTrack(0);
+    }
+
+    return () => {
+      tracks.forEach(track => {
+        track.pause();
+        track.removeEventListener('ended', handleTrackEnded);
+      });
+      releasePendingInteraction();
+    };
+  }, [playBackgroundTrack, releasePendingInteraction]);
+
+  const playButtonSound = useCallback(() => {
+    if (!soundEnabled) {
+      return;
+    }
+
+    const sound = buttonSoundRef.current;
+    if (!sound) {
+      return;
+    }
+
+    try {
+      sound.currentTime = 0;
+    } catch (error) {
+      // Ignore browsers that disallow programmatic scrub
+    }
+
+    sound.play().catch(() => {
+      // Ignore playback interruptions
+    });
+  }, [soundEnabled]);
+
+  const playLevelCompleteSound = useCallback(() => {
+    if (!soundEnabled) {
+      return;
+    }
+
+    const sound = levelCompleteRef.current;
+    if (!sound) {
+      return;
+    }
+
+    try {
+      sound.currentTime = 0;
+    } catch (error) {
+      // Ignore browsers that disallow programmatic scrub
+    }
+
+    sound.play().catch(() => {
+      // Ignore playback interruptions
+    });
+  }, [soundEnabled]);
 
   const playPourSound = () => {
     // Simple sound effect using Web Audio API
@@ -390,6 +659,12 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         setUserProgress,
         audioEnabled,
         toggleAudio,
+        soundEnabled,
+        musicEnabled,
+        toggleSound,
+        toggleMusic,
+        playButtonSound,
+        playLevelCompleteSound,
         moveHistory,
         redoHistory
       }}
