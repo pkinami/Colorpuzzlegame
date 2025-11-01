@@ -1,89 +1,92 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { X, Volume2, VolumeX } from 'lucide-react';
+import { X, Volume2, VolumeX, Music4 } from 'lucide-react';
 import { useGame } from '../contexts/game-context';
+import './settings.css';
 
 interface SettingsProps {
   onClose: () => void;
 }
 
 export const Settings: React.FC<SettingsProps> = ({ onClose }) => {
-  const { audioEnabled, toggleAudio } = useGame();
+  const { musicEnabled, soundEnabled, toggleMusic, toggleSound, playButtonSound } = useGame();
+
+  const handleClose = () => {
+    playButtonSound();
+    onClose();
+  };
+
+  const handleToggleMusic = () => {
+    playButtonSound();
+    toggleMusic();
+  };
+
+  const handleToggleSound = () => {
+    playButtonSound();
+    toggleSound();
+  };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50"
-      onClick={onClose}
-    >
-      <div
-        className="bg-gradient-to-br from-purple-800 to-blue-800 rounded-3xl p-8 max-w-md w-full shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h2>Settings</h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-          >
-            <X size={24} />
+    <div className="settings-overlay" onClick={handleClose}>
+      <div className="settings-panel" onClick={event => event.stopPropagation()}>
+        <div className="settings-header">
+          <h2 className="settings-title">Settings</h2>
+          <button type="button" onClick={handleClose} className="settings-close-button" aria-label="Close settings">
+            <X size={20} />
           </button>
         </div>
 
-        {/* Settings Options */}
-        <div className="space-y-6">
-          {/* Audio Toggle */}
-          <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
-            <div className="flex items-center gap-3">
-              {audioEnabled ? <Volume2 size={24} /> : <VolumeX size={24} />}
+        <div className="settings-body">
+          <div className="settings-card">
+            <div className="settings-card-main">
+              <span className="settings-icon-chip settings-icon-chip--music">
+                <Music4 size={20} />
+              </span>
               <div>
-                <div>Sound Effects</div>
-                <div className="text-sm text-gray-400">
-                  {audioEnabled ? 'Enabled' : 'Disabled'}
+                <div className="settings-card-title">Background Music</div>
+                <div className="settings-card-caption">
+                  {musicEnabled ? 'Soothing tunes are on' : 'Music is currently muted'}
                 </div>
               </div>
             </div>
             <button
-              onClick={toggleAudio}
-              className={`relative w-14 h-8 rounded-full transition-colors ${
-                audioEnabled ? 'bg-green-500' : 'bg-gray-600'
-              }`}
+              type="button"
+              onClick={handleToggleMusic}
+              aria-pressed={musicEnabled}
+              className={`settings-toggle ${musicEnabled ? 'settings-toggle--active' : ''}`}
             >
-              <motion.div
-                className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full"
-                animate={{ x: audioEnabled ? 24 : 0 }}
-                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              <motion.span
+                className="settings-toggle-knob"
+                animate={{ x: musicEnabled ? 28 : 0 }}
+                transition={{ type: 'spring', stiffness: 380, damping: 30 }}
               />
             </button>
           </div>
 
-          {/* Clear Progress */}
-          <div className="p-4 bg-white/5 rounded-xl">
-            <div className="mb-3">Clear Progress</div>
-            <p className="text-sm text-gray-400 mb-4">
-              Reset all your level progress and start fresh
-            </p>
+          <div className="settings-card">
+            <div className="settings-card-main">
+              <span className="settings-icon-chip settings-icon-chip--sound">
+                {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+              </span>
+              <div>
+                <div className="settings-card-title">Sound Effects</div>
+                <div className="settings-card-caption">
+                  {soundEnabled ? 'Button sounds are enabled' : 'Sound effects muted'}
+                </div>
+              </div>
+            </div>
             <button
-              onClick={() => {
-                if (confirm('Are you sure you want to clear all progress? This cannot be undone.')) {
-                  localStorage.removeItem('crayon-progress');
-                  window.location.reload();
-                }
-              }}
-              className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              type="button"
+              onClick={handleToggleSound}
+              aria-pressed={soundEnabled}
+              className={`settings-toggle ${soundEnabled ? 'settings-toggle--active' : ''}`}
             >
-              Clear All Progress
+              <motion.span
+                className="settings-toggle-knob"
+                animate={{ x: soundEnabled ? 28 : 0 }}
+                transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+              />
             </button>
-          </div>
-
-          {/* About */}
-          <div className="p-4 bg-white/5 rounded-xl">
-            <div className="mb-2">About Crayon</div>
-            <p className="text-sm text-gray-400">
-              A color puzzle game where you pour colored segments between tubes to
-              solve challenging puzzles. Complete levels to earn stars and climb the
-              leaderboard!
-            </p>
           </div>
         </div>
       </div>
