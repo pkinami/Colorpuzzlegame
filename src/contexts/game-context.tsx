@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { Tube, LEVELS } from '../utils/level-data';
 import { PourSystem } from '../utils/game-logic';
 
@@ -11,10 +11,18 @@ interface GameState {
   isFailed: boolean;
   selectedTube: string | null;
   userProgress: { [levelId: number]: { stars: number; completed: boolean } };
-  moveLimit: number;
-  remainingMoves: number;
-  timeLimitSeconds: number;
-  timeRemaining: number;
+  coinBalance: number;
+  lastCoinsEarned: number;
+}
+
+interface GameSnapshot {
+  tubes: Tube[];
+  moves: number;
+  stars: number;
+  isComplete: boolean;
+  isFailed: boolean;
+  selectedTube: string | null;
+  lastCoinsEarned: number;
 }
 
 interface GameContextType {
@@ -23,17 +31,12 @@ interface GameContextType {
   selectTube: (tubeId: string) => void;
   resetLevel: () => void;
   undoMove: () => void;
+  redoMove: () => void;
   setUserProgress: (progress: GameState['userProgress']) => void;
   audioEnabled: boolean;
   toggleAudio: () => void;
-  moveHistory: {
-    fromTubeId: string;
-    toTubeId: string;
-    previousTubes: Tube[];
-    previousRemainingMoves: number;
-    previousTimeRemaining: number;
-    previousIsFailed: boolean;
-  }[];
+  moveHistory: GameSnapshot[];
+  redoHistory: GameSnapshot[];
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -60,56 +63,30 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     isFailed: false,
     selectedTube: null,
     userProgress: {},
-    moveLimit: 0,
-    remainingMoves: 0,
-    timeLimitSeconds: 0,
-    timeRemaining: 0
+    coinBalance: 0,
+    lastCoinsEarned: 0
   });
 
-  const [moveHistory, setMoveHistory] = useState<GameContextType['moveHistory']>([]);
+  const [moveHistory, setMoveHistory] = useState<GameSnapshot[]>([]);
+  const [redoHistory, setRedoHistory] = useState<GameSnapshot[]>([]);
   const [audioEnabled, setAudioEnabled] = useState(true);
-  const timerRef = useRef<number | null>(null);
 
-  const clearTimer = useCallback(() => {
-    if (typeof window === 'undefined') return;
-    if (timerRef.current !== null) {
-      window.clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-  }, []);
+  const cloneTubes = useCallback((tubes: Tube[]): Tube[] =>
+    tubes.map(tube => ({
+      ...tube,
+      segments: tube.segments.map(seg => ({ ...seg })),
+      unlockCondition: tube.unlockCondition ? { ...tube.unlockCondition } : undefined
+    })), []);
 
-  const startTimer = useCallback((duration: number) => {
-    clearTimer();
-
-    if (typeof window === 'undefined' || duration <= 0) {
-      return;
-    }
-
-    timerRef.current = window.setInterval(() => {
-      setGameState(prev => {
-        if (prev.isComplete || prev.isFailed) {
-          return prev;
-        }
-
-        const updatedTime = Math.max(0, prev.timeRemaining - 1);
-
-        if (updatedTime === 0 && !prev.isComplete) {
-          clearTimer();
-          return {
-            ...prev,
-            timeRemaining: 0,
-            isFailed: true,
-            selectedTube: null
-          };
-        }
-
-        return {
-          ...prev,
-          timeRemaining: updatedTime
-        };
-      });
-    }, 1000);
-  }, [clearTimer]);
+  const createSnapshot = useCallback((): GameSnapshot => ({
+    tubes: cloneTubes(gameState.tubes),
+    moves: gameState.moves,
+    stars: gameState.stars,
+    isComplete: gameState.isComplete,
+    isFailed: gameState.isFailed,
+    selectedTube: gameState.selectedTube,
+    lastCoinsEarned: gameState.lastCoinsEarned
+  }), [cloneTubes, gameState.isComplete, gameState.isFailed, gameState.lastCoinsEarned, gameState.moves, gameState.selectedTube, gameState.stars, gameState.tubes]);
 
   const shuffle = <T,>(items: T[]): T[] => {
     const copy = [...items];
@@ -137,7 +114,6 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     const level = LEVELS.find(l => l.id === levelId);
     if (!level) return;
 
-    clearTimer();
     const clonedTubes = level.tubes.map(tube => ({
       ...tube,
       segments: tube.segments.map(seg => ({ ...seg })),
@@ -170,7 +146,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       });
     }
 
-    setGameState({
+    setGameState(prev => ({
       currentLevel: levelId,
       tubes: preparedTubes,
       moves: 0,
@@ -178,26 +154,17 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       isComplete: false,
       isFailed: false,
       selectedTube: null,
-      userProgress: gameState.userProgress,
-      moveLimit: level.moveLimit,
-      remainingMoves: level.moveLimit,
-      timeLimitSeconds: level.timeLimitSeconds,
-      timeRemaining: level.timeLimitSeconds
-    });
+      userProgress: prev.userProgress,
+      coinBalance: prev.coinBalance,
+      lastCoinsEarned: 0
+    }));
 
     setMoveHistory([]);
-
-    startTimer(level.timeLimitSeconds);
+    setRedoHistory([]);
   };
 
   const selectTube = (tubeId: string) => {
     if (gameState.isComplete || gameState.isFailed) return;
-
-    const remainingMovesExhausted = gameState.remainingMoves <= 0;
-    if (remainingMovesExhausted) {
-      setGameState(prev => ({ ...prev, selectedTube: null }));
-      return;
-    }
 
     const targetTube = gameState.tubes.find(t => t.id === tubeId);
     if (!targetTube) return;
@@ -232,18 +199,8 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
     if (result.success && result.updatedTubes) {
       // Save to history for undo
-      setMoveHistory(prev => [...prev, {
-        fromTubeId: gameState.selectedTube!,
-        toTubeId: tubeId,
-        previousTubes: gameState.tubes.map(tube => ({
-          ...tube,
-          segments: tube.segments.map(seg => ({ ...seg })),
-          unlockCondition: tube.unlockCondition ? { ...tube.unlockCondition } : undefined
-        })),
-        previousRemainingMoves: gameState.remainingMoves,
-        previousTimeRemaining: gameState.timeRemaining,
-        previousIsFailed: gameState.isFailed
-      }]);
+      setMoveHistory(prev => [...prev, createSnapshot()]);
+      setRedoHistory([]);
 
       const newMoves = gameState.moves + 1;
       let updatedTubes = result.updatedTubes.map(tube => ({ ...tube }));
@@ -257,16 +214,25 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       });
 
       const isComplete = PourSystem.isLevelComplete(updatedTubes);
-      const newRemainingMoves = Math.max(0, gameState.remainingMoves - 1);
-
-      let didFail = false;
       let starsEarned = 0;
+      let coinsEarned = 0;
 
       if (isComplete) {
         const level = LEVELS.find(l => l.id === gameState.currentLevel);
         if (level) {
-          const timeUsed = Math.max(0, level.timeLimitSeconds - gameState.timeRemaining);
-          starsEarned = PourSystem.calculateStars(newMoves, timeUsed, level.starThresholds);
+          starsEarned = PourSystem.calculateStars(newMoves, 0, level.starThresholds);
+          const minimumMoves = Math.max(0, level.starThresholds.five.moves);
+          const extraMoves = Math.max(0, newMoves - minimumMoves);
+
+          if (extraMoves === 0) {
+            coinsEarned = 100;
+          } else if (extraMoves >= 10) {
+            coinsEarned = 10;
+          } else if (extraMoves >= 9) {
+            coinsEarned = 20;
+          } else {
+            coinsEarned = Math.max(10, 100 - extraMoves * 10);
+          }
 
           // Update progress
           const updatedProgress = { ...gameState.userProgress };
@@ -274,7 +240,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
             updatedProgress[gameState.currentLevel] = { stars: starsEarned, completed: true };
           }
 
-          clearTimer();
+          const updatedCoinBalance = gameState.coinBalance + coinsEarned;
 
           setGameState(prev => ({
             ...prev,
@@ -285,18 +251,14 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
             isFailed: false,
             selectedTube: null,
             userProgress: updatedProgress,
-            remainingMoves: newRemainingMoves,
-            timeRemaining: prev.timeRemaining
+            coinBalance: updatedCoinBalance,
+            lastCoinsEarned: coinsEarned
           }));
 
           localStorage.setItem('crayon-progress', JSON.stringify(updatedProgress));
+          localStorage.setItem('crayon-coin-balance', JSON.stringify(updatedCoinBalance));
           return;
         }
-      }
-
-      if (!isComplete && newRemainingMoves === 0) {
-        didFail = true;
-        clearTimer();
       }
 
       setGameState(prev => ({
@@ -304,13 +266,11 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         tubes: updatedTubes,
         moves: newMoves,
         isComplete,
-        isFailed: didFail,
-        selectedTube: null,
-        remainingMoves: newRemainingMoves,
-        timeRemaining: prev.timeRemaining
+        isFailed: false,
+        selectedTube: null
       }));
 
-      if (audioEnabled && !didFail) {
+      if (audioEnabled) {
         playPourSound();
       }
     } else {
@@ -326,18 +286,41 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   const undoMove = () => {
     if (moveHistory.length === 0) return;
 
-    const lastMove = moveHistory[moveHistory.length - 1];
+    const currentSnapshot = createSnapshot();
+    const previousSnapshot = moveHistory[moveHistory.length - 1];
+
+    setRedoHistory(prev => [...prev, currentSnapshot]);
     setMoveHistory(prev => prev.slice(0, -1));
 
     setGameState(prev => ({
       ...prev,
-      tubes: lastMove.previousTubes,
-      moves: Math.max(0, prev.moves - 1),
-      isComplete: false,
-      isFailed: lastMove.previousIsFailed,
+      tubes: cloneTubes(previousSnapshot.tubes),
+      moves: previousSnapshot.moves,
+      stars: previousSnapshot.stars,
+      isComplete: previousSnapshot.isComplete,
+      isFailed: previousSnapshot.isFailed,
       selectedTube: null,
-      remainingMoves: lastMove.previousRemainingMoves,
-      timeRemaining: lastMove.previousTimeRemaining
+      lastCoinsEarned: previousSnapshot.lastCoinsEarned
+    }));
+  };
+
+  const redoMove = () => {
+    if (redoHistory.length === 0) return;
+
+    const nextSnapshot = redoHistory[redoHistory.length - 1];
+
+    setMoveHistory(prev => [...prev, createSnapshot()]);
+    setRedoHistory(prev => prev.slice(0, -1));
+
+    setGameState(prev => ({
+      ...prev,
+      tubes: cloneTubes(nextSnapshot.tubes),
+      moves: nextSnapshot.moves,
+      stars: nextSnapshot.stars,
+      isComplete: nextSnapshot.isComplete,
+      isFailed: nextSnapshot.isFailed,
+      selectedTube: null,
+      lastCoinsEarned: nextSnapshot.lastCoinsEarned
     }));
   };
 
@@ -359,10 +342,18 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    return () => {
-      clearTimer();
-    };
-  }, [clearTimer]);
+    const savedCoins = localStorage.getItem('crayon-coin-balance');
+    if (savedCoins) {
+      try {
+        const coins = JSON.parse(savedCoins);
+        if (typeof coins === 'number' && Number.isFinite(coins)) {
+          setGameState(prev => ({ ...prev, coinBalance: coins }));
+        }
+      } catch (e) {
+        console.error('Failed to load coin balance:', e);
+      }
+    }
+  }, []);
 
   const playPourSound = () => {
     // Simple sound effect using Web Audio API
@@ -395,10 +386,12 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         selectTube,
         resetLevel,
         undoMove,
+        redoMove,
         setUserProgress,
         audioEnabled,
         toggleAudio,
-        moveHistory
+        moveHistory,
+        redoHistory
       }}
     >
       {children}
