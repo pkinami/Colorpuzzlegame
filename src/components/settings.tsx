@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { X, Volume2, VolumeX } from 'lucide-react';
+import { X, Volume2, VolumeX, Music4 } from 'lucide-react';
 import { useGame } from '../contexts/game-context';
 
 interface SettingsProps {
@@ -8,82 +8,101 @@ interface SettingsProps {
 }
 
 export const Settings: React.FC<SettingsProps> = ({ onClose }) => {
-  const { audioEnabled, toggleAudio } = useGame();
+  const { musicEnabled, soundEnabled, toggleMusic, toggleSound, playButtonSound } = useGame();
+
+  const handleClose = () => {
+    playButtonSound();
+    onClose();
+  };
+
+  const handleToggleMusic = () => {
+    playButtonSound();
+    toggleMusic();
+  };
+
+  const handleToggleSound = () => {
+    playButtonSound();
+    toggleSound();
+  };
 
   return (
     <div
-      className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50"
-      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      onClick={handleClose}
     >
       <div
-        className="bg-gradient-to-br from-purple-800 to-blue-800 rounded-3xl p-8 max-w-md w-full shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-md rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-900 to-purple-900 p-8 text-white shadow-2xl"
+        onClick={event => event.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h2>Settings</h2>
+        <div className="mb-8 flex items-center justify-between">
+          <div className="text-2xl font-bold tracking-wide">Settings</div>
           <button
-            onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            type="button"
+            onClick={handleClose}
+            className="rounded-full bg-white/10 p-2 transition hover:bg-white/20"
+            aria-label="Close settings"
           >
-            <X size={24} />
+            <X size={20} />
           </button>
         </div>
 
-        {/* Settings Options */}
-        <div className="space-y-6">
-          {/* Audio Toggle */}
-          <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
-            <div className="flex items-center gap-3">
-              {audioEnabled ? <Volume2 size={24} /> : <VolumeX size={24} />}
-              <div>
-                <div>Sound Effects</div>
-                <div className="text-sm text-gray-400">
-                  {audioEnabled ? 'Enabled' : 'Disabled'}
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-white/10 bg-white/10 p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="rounded-full bg-indigo-500/20 p-3 text-indigo-200">
+                  <Music4 size={20} />
+                </span>
+                <div>
+                  <div className="text-lg font-semibold">Background Music</div>
+                  <div className="text-sm text-indigo-100/80">
+                    {musicEnabled ? 'Soothing tunes are on' : 'Music is currently muted'}
+                  </div>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={handleToggleMusic}
+                className={`relative h-9 w-16 rounded-full transition ${
+                  musicEnabled ? 'bg-emerald-400/90' : 'bg-slate-600'
+                }`}
+              >
+                <motion.span
+                  className="absolute top-1 left-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white shadow"
+                  animate={{ x: musicEnabled ? 28 : 0 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                />
+              </button>
             </div>
-            <button
-              onClick={toggleAudio}
-              className={`relative w-14 h-8 rounded-full transition-colors ${
-                audioEnabled ? 'bg-green-500' : 'bg-gray-600'
-              }`}
-            >
-              <motion.div
-                className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full"
-                animate={{ x: audioEnabled ? 24 : 0 }}
-                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-              />
-            </button>
           </div>
 
-          {/* Clear Progress */}
-          <div className="p-4 bg-white/5 rounded-xl">
-            <div className="mb-3">Clear Progress</div>
-            <p className="text-sm text-gray-400 mb-4">
-              Reset all your level progress and start fresh
-            </p>
-            <button
-              onClick={() => {
-                if (confirm('Are you sure you want to clear all progress? This cannot be undone.')) {
-                  localStorage.removeItem('crayon-progress');
-                  window.location.reload();
-                }
-              }}
-              className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
-            >
-              Clear All Progress
-            </button>
-          </div>
-
-          {/* About */}
-          <div className="p-4 bg-white/5 rounded-xl">
-            <div className="mb-2">About Crayon</div>
-            <p className="text-sm text-gray-400">
-              A color puzzle game where you pour colored segments between tubes to
-              solve challenging puzzles. Complete levels to earn stars and climb the
-              leaderboard!
-            </p>
+          <div className="rounded-2xl border border-white/10 bg-white/10 p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="rounded-full bg-yellow-500/20 p-3 text-yellow-200">
+                  {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                </span>
+                <div>
+                  <div className="text-lg font-semibold">Sound Effects</div>
+                  <div className="text-sm text-indigo-100/80">
+                    {soundEnabled ? 'Button sounds are enabled' : 'Sound effects muted'}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleToggleSound}
+                className={`relative h-9 w-16 rounded-full transition ${
+                  soundEnabled ? 'bg-emerald-400/90' : 'bg-slate-600'
+                }`}
+              >
+                <motion.span
+                  className="absolute top-1 left-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white shadow"
+                  animate={{ x: soundEnabled ? 28 : 0 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                />
+              </button>
+            </div>
           </div>
         </div>
       </div>
