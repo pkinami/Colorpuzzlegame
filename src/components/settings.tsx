@@ -48,6 +48,19 @@ export const Settings: React.FC<SettingsProps> = ({ onClose }) => {
                   {musicEnabled ? 'Soothing tunes are on' : 'Music is currently muted'}
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={handleToggleMusic}
+                className={`relative h-9 w-16 rounded-full transition ${
+                  musicEnabled ? 'bg-emerald-400/90' : 'bg-slate-600'
+                }`}
+              >
+                <motion.span
+                  className="absolute top-1 left-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white shadow"
+                  animate={{ x: musicEnabled ? 28 : 0 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                />
+              </button>
             </div>
             <button
               type="button"
