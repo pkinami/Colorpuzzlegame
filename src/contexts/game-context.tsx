@@ -509,6 +509,13 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
           const updatedCoinBalance = Math.max(0, Math.min(9999, gameState.coinBalance + coinsEarned));
 
+          const initialSolution = initialTubesRef.current.length
+            ? computeSolutionForTubes(initialTubesRef.current)
+            : null;
+          const optimalFromStart = initialSolution && initialSolution.solved
+            ? initialSolution.moves.length
+            : null;
+
           setGameState(prev => ({
             ...prev,
             tubes: updatedTubes,
