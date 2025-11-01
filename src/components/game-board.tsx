@@ -231,6 +231,18 @@ export const GameBoard: React.FC = () => {
                 {hasNextLevel ? 'Next Level' : 'Restart'}
               </button>
             </div>
+            <h2 className="text-2xl font-semibold tracking-[0.18em] uppercase mb-4 text-white/90">
+              {failureReason === 'time' ? 'Time Up' : failureReason === 'moves' ? 'No Moves' : 'Try Again'}
+            </h2>
+            <p className="text-sm text-white/60 mb-6 tracking-[0.1em]">
+              Tap retry to give this level another shot.
+            </p>
+            <button
+              onClick={resetLevel}
+              className="rounded-full bg-yellow-400/90 text-black font-semibold px-5 py-3 text-sm uppercase tracking-[0.28em]"
+            >
+              Retry Level
+            </button>
           </div>
         </div>
       )}
