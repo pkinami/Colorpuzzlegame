@@ -488,12 +488,12 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         const level = LEVELS.find(l => l.id === gameState.currentLevel);
         if (level) {
           starsEarned = PourSystem.calculateStars(newMoves, 0, level.starThresholds);
-          const initialSolution = initialTubesRef.current.length
+          const initialLevelSolution = initialTubesRef.current.length
             ? computeSolutionForTubes(initialTubesRef.current)
             : null;
 
-          if (initialSolution && initialSolution.solved) {
-            optimalFromStart = initialSolution.moves.length;
+          if (initialLevelSolution && initialLevelSolution.solved) {
+            optimalFromStart = initialLevelSolution.moves.length;
           }
 
           const baselineMoves = optimalFromStart ?? Math.max(0, level.starThresholds.five.moves);
@@ -508,13 +508,6 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
           }
 
           const updatedCoinBalance = Math.max(0, Math.min(9999, gameState.coinBalance + coinsEarned));
-
-          const initialSolution = initialTubesRef.current.length
-            ? computeSolutionForTubes(initialTubesRef.current)
-            : null;
-          const optimalFromStart = initialSolution && initialSolution.solved
-            ? initialSolution.moves.length
-            : null;
 
           setGameState(prev => ({
             ...prev,
