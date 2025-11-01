@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Tube } from './tube';
 import { useGame } from '../contexts/game-context';
-import { RotateCcw, Undo2, Plus, Pause, Gem, Star } from 'lucide-react';
+import { RotateCcw, Undo2, Redo2, Star, Coins } from 'lucide-react';
 import { LEVELS } from '../utils/level-data';
 
 export const GameBoard: React.FC = () => {
@@ -73,16 +73,17 @@ export const GameBoard: React.FC = () => {
   const currentLevel = LEVELS.find(level => level.id === gameState.currentLevel);
   const hasNextLevel = currentLevel ? currentLevel.id < LEVELS.length : false;
   const totalTubes = gameState.tubes.length;
+  const reduceTubeMotion = true;
   const preferredRows = 2;
   const columns = Math.max(1, Math.ceil(totalTubes / preferredRows));
-  const gapPx = totalTubes >= 20 ? 18 : totalTubes > 12 ? 22 : 26;
+  const gapPx = totalTubes >= 20 ? 20 : totalTubes > 12 ? 24 : 28;
   const availableWidth = gridWidth > 0 ? gridWidth - gapPx * (columns - 1) : 0;
   const computedTubeWidth = availableWidth > 0 ? availableWidth / columns : 72;
-  const minTubeWidth = totalTubes >= 20 ? 44 : totalTubes >= 15 ? 50 : 56;
-  const maxTubeWidth = totalTubes >= 20 ? 56 : totalTubes >= 15 ? 64 : 68;
-  const tubeWidth = Math.max(minTubeWidth, Math.min(maxTubeWidth, computedTubeWidth));
+  const minTubeWidth = totalTubes >= 20 ? 44 : totalTubes >= 15 ? 50 : 58;
+  const maxTubeWidth = totalTubes >= 20 ? 56 : totalTubes >= 15 ? 64 : 70;
+  const tubeWidth = Math.max(minTubeWidth, Math.min(maxTubeWidth, computedTubeWidth)) * 0.9;
   const tubeScale = tubeWidth / 70;
-  const heightScale = Math.min(1.08, 1 + Math.max(0, (1 - tubeScale) * 0.22));
+  const heightScale = Math.min(1.12, 1.02 + Math.max(0, (1 - tubeScale) * 0.28));
 
   const gridStyles = useMemo(
     () => ({
@@ -90,7 +91,7 @@ export const GameBoard: React.FC = () => {
       gap: `${gapPx}px`,
       justifyItems: 'center',
       alignContent: 'start',
-      padding: totalTubes >= 15 ? '4px 8px 24px' : '12px 12px 28px'
+      padding: totalTubes >= 15 ? '0 4px 20px' : '6px 8px 24px'
     }),
     [columns, gapPx, totalTubes]
   );
@@ -130,27 +131,26 @@ export const GameBoard: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col" style={boardBackgroundStyle}>
       <header className="px-5 sm:px-8 pt-6 pb-4">
-        <div className="mx-auto max-w-2xl flex items-center justify-between text-white">
-          <div className="flex items-center gap-2 rounded-full bg-white/10 backdrop-blur px-4 py-2">
-            <Gem size={20} className="text-pink-200" />
-            <span className="text-lg font-extrabold tracking-wide">{Math.max(0, Math.round(gameState.coinBalance))}</span>
+        <div className="mx-auto max-w-4xl flex flex-wrap items-center justify-between gap-4 text-white/80 text-xs uppercase tracking-[0.28em]">
+          <div className="flex items-center gap-2 bg-white/5 rounded-full px-4 py-2">
+            <Coins size={16} className="text-yellow-300" />
+            <span className="tracking-[0.18em] text-white/90 font-semibold">{Math.max(0, Math.round(gameState.coinBalance))}</span>
           </div>
-          <div className="flex flex-col items-center">
-            <span className="text-sm font-bold uppercase tracking-[0.28em] text-white/70">Level</span>
-            <span className="text-3xl font-black tracking-[0.12em] text-white">Lv.{currentLevel?.id ?? '--'}</span>
+          <div className="text-center">
+            <div className="text-white/50">Level</div>
+            <div className="text-2xl tracking-[0.18em] font-semibold text-white">Lv.{currentLevel?.id ?? '--'}</div>
           </div>
-          <button
-            type="button"
-            className="flex items-center justify-center rounded-full bg-white/10 backdrop-blur px-3 py-3 text-white hover:bg-white/20 transition-colors"
-            aria-label="Pause"
-          >
-            <Pause size={22} />
-          </button>
+          <div className="flex items-center gap-3 text-white/70">
+            <div className="flex flex-col items-end gap-0.5">
+              <span className="tracking-[0.24em] text-[10px]">Moves</span>
+              <span className="text-base tracking-[0.18em] text-white">{gameState.moves}</span>
+            </div>
+          </div>
         </div>
       </header>
 
       <div className="flex-1 w-full flex flex-col items-center px-5 sm:px-8 pb-6">
-        <div className="mx-auto w-full max-w-2xl flex-1 flex flex-col items-center justify-center">
+        <div className="mx-auto max-w-4xl w-full flex-1 flex flex-col items-center justify-center">
           <div ref={gridRef} className="grid w-full justify-items-center" style={gridStyles}>
             {gameState.tubes.map(tube => (
               <div key={tube.id} className="transition-transform duration-200 ease-out">
@@ -160,6 +160,7 @@ export const GameBoard: React.FC = () => {
                   onSelect={() => selectTube(tube.id)}
                   scale={tubeScale}
                   heightScale={heightScale}
+                  reduceMotion={reduceTubeMotion}
                 />
               </div>
             ))}
@@ -167,29 +168,27 @@ export const GameBoard: React.FC = () => {
         </div>
       </div>
 
-      <footer className="px-5 sm:px-8 pb-10">
-        <div className="mx-auto max-w-md w-full flex items-center justify-between gap-4">
+      <footer className="px-5 sm:px-8 pt-4 pb-12">
+        <div className="mx-auto max-w-3xl w-full flex flex-col sm:flex-row flex-wrap items-center justify-center gap-4 sm:gap-6">
           <button
             onClick={undoMove}
             disabled={moveHistory.length === 0}
-            className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-yellow-200 via-yellow-300 to-yellow-500 text-black font-extrabold text-lg px-4 py-3 shadow-[0_6px_0_#b45309] transition-all disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed active:translate-y-[3px] active:shadow-[0_3px_0_#b45309]"
+            className="flex items-center gap-2 rounded-2xl bg-gradient-to-b from-yellow-200 via-yellow-300 to-yellow-500 text-black font-semibold px-7 py-3 text-sm uppercase tracking-[0.2em] shadow-[0_8px_0_#b45309] transition-all disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed active:translate-y-[4px] active:shadow-[0_4px_0_#b45309]"
           >
-            <Undo2 size={24} />
-          </button>
-          <button
-            onClick={resetLevel}
-            className="flex-1 flex items-center justify-center gap-3 rounded-2xl bg-gradient-to-b from-yellow-200 via-yellow-300 to-yellow-500 text-black font-extrabold text-lg px-4 py-3 shadow-[0_6px_0_#b45309] transition-all active:translate-y-[3px] active:shadow-[0_3px_0_#b45309]"
-          >
-            <RotateCcw size={24} />
-            <span className="text-2xl font-black leading-none">{gameState.moves}</span>
+            <Undo2 size={18} /> Undo
           </button>
           <button
             onClick={redoMove}
             disabled={redoHistory.length === 0}
-            className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-emerald-300 via-emerald-400 to-emerald-500 text-black font-extrabold text-lg px-4 py-3 shadow-[0_6px_0_#047857] transition-all disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed active:translate-y-[3px] active:shadow-[0_3px_0_#047857]"
+            className="flex items-center gap-2 rounded-2xl bg-[#1f1f1f] text-white font-semibold px-7 py-3 text-sm uppercase tracking-[0.2em] shadow-[0_4px_0_rgba(0,0,0,0.6)] transition-all disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed active:translate-y-[2px] active:shadow-[0_2px_0_rgba(0,0,0,0.6)]"
           >
-            <Plus size={24} />
-            <span className="text-2xl font-black leading-none">+2</span>
+            <Redo2 size={18} /> Redo
+          </button>
+          <button
+            onClick={resetLevel}
+            className="flex items-center gap-2 rounded-2xl bg-gradient-to-b from-yellow-200 via-yellow-300 to-yellow-500 text-black font-semibold px-7 py-3 text-sm uppercase tracking-[0.2em] shadow-[0_8px_0_#b45309] transition-all active:translate-y-[4px] active:shadow-[0_4px_0_#b45309]"
+          >
+            <RotateCcw size={18} /> Reset
           </button>
         </div>
       </footer>
@@ -213,21 +212,21 @@ export const GameBoard: React.FC = () => {
                 );
               })}
             </div>
-            <h2 className="text-3xl font-black tracking-[0.15em] uppercase mb-4 text-white">Level Clear</h2>
-            <p className="text-sm text-white/60 tracking-[0.3em] uppercase mb-2 font-semibold">Performance</p>
-            <p className="text-xl font-extrabold text-white mb-2">{formattedCompletionTime}</p>
-            <p className="text-sm text-white/60 tracking-[0.3em] uppercase mb-1 font-semibold">Coins Earned</p>
-            <p className="text-xl font-extrabold text-yellow-300 mb-6">+{gameState.lastCoinsEarned}</p>
+            <h2 className="text-2xl font-semibold tracking-[0.18em] uppercase mb-4 text-white/90">Level Clear</h2>
+            <p className="text-sm text-white/60 tracking-[0.24em] uppercase mb-2">Performance</p>
+            <p className="text-lg font-semibold text-white mb-2">{formattedCompletionTime}</p>
+            <p className="text-sm text-white/60 tracking-[0.24em] uppercase mb-1">Coins Earned</p>
+            <p className="text-lg font-semibold text-yellow-300 mb-6">+{gameState.lastCoinsEarned}</p>
             <div className="flex flex-col gap-3">
               <button
                 onClick={resetLevel}
-                className="rounded-full bg-yellow-400/90 text-black font-extrabold px-5 py-3 text-sm uppercase tracking-[0.28em]"
+                className="rounded-full bg-yellow-400/90 text-black font-semibold px-5 py-3 text-sm uppercase tracking-[0.28em]"
               >
                 Play Again
               </button>
               <button
                 onClick={hasNextLevel ? handleNextLevel : resetLevel}
-                className="rounded-full bg-white/10 text-white font-extrabold px-5 py-3 text-sm uppercase tracking-[0.28em]"
+                className="rounded-full bg-white/10 text-white font-semibold px-5 py-3 text-sm uppercase tracking-[0.28em]"
               >
                 {hasNextLevel ? 'Next Level' : 'Restart'}
               </button>
@@ -235,6 +234,7 @@ export const GameBoard: React.FC = () => {
           </div>
         </div>
       )}
+
     </div>
   );
 };
