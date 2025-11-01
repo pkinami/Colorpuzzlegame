@@ -7,85 +7,25 @@ import { LEVELS } from '../utils/level-data';
 import { Settings } from './settings';
 import './game-board.css';
 
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      'dotlottie-player': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;
-    }
-  }
-}
-
-const LevelCompleteAnimation: React.FC = () => {
-  const [isReady, setIsReady] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadPlayer = async () => {
-      if (typeof window === 'undefined') {
-        return;
-      }
-
-      if ((window as any).DotLottiePlayerWebComponent) {
-        if (!cancelled) {
-          setIsReady(true);
-        }
-        return;
-      }
-
-      await new Promise<void>((resolve, reject) => {
-        if (typeof document === 'undefined') {
-          resolve();
-          return;
-        }
-
-        const existing = document.querySelector('script[data-dot-lottie-player]');
-        if (existing) {
-          existing.addEventListener('load', () => resolve(), { once: true });
-          existing.addEventListener('error', () => reject(new Error('failed to load dotlottie player')), { once: true });
-          return;
-        }
-
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/@dotlottie/player-component@latest/dist/dotlottie-player.js';
-        script.async = true;
-        script.setAttribute('data-dot-lottie-player', 'true');
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error('failed to load dotlottie player'));
-        document.head.appendChild(script);
-      })
-        .then(() => {
-          if (!cancelled) {
-            setIsReady(true);
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setIsReady(false);
-          }
-        });
-    };
-
-    loadPlayer();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (!isReady) {
-    return <div className="gameboard__completion-fallback" aria-hidden="true" />;
-  }
-
-  return (
-    <dotlottie-player
-      src="/music_effects/level_complete_animation.lottie"
-      autoplay
-      loop
-      style={{ width: '100%', height: '100%' }}
-    ></dotlottie-player>
-  );
-};
+const LevelCompleteAnimation: React.FC = () => (
+  <div className="gameboard__celebration" aria-hidden="true">
+    <div className="gameboard__celebration-glow" />
+    <div className="gameboard__celebration-rings">
+      <span />
+      <span />
+    </div>
+    <div className="gameboard__celebration-burst">
+      {Array.from({ length: 12 }).map((_, index) => (
+        <span key={index} className="gameboard__celebration-particle" style={{ ['--burst-index' as const]: index }} />
+      ))}
+    </div>
+    <div className="gameboard__celebration-stars">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <span key={index} className="gameboard__celebration-star" style={{ ['--star-index' as const]: index }} />
+      ))}
+    </div>
+  </div>
+);
 
 export const GameBoard: React.FC = () => {
   const {
@@ -202,7 +142,7 @@ export const GameBoard: React.FC = () => {
     if (moves <= 6) return 'Awesome!';
     if (moves <= 8) return 'Brilliant!';
     if (moves <= 10) return 'Legendary!';
-    return 'Level Complete!';
+    return 'Nice!';
   }, [gameState.moves]);
 
   const bestMoveSummary = useMemo(() => {
@@ -395,17 +335,21 @@ export const GameBoard: React.FC = () => {
         <div className="gameboard__header-inner">
           <div className="gameboard__header-top">
             <div className="gameboard__top-group">
-              <div className="gameboard__top-chip" aria-label="Diamonds available">
-                <img src="/icons/diamond.png" alt="" className="gameboard__diamond-icon" />
+              <div className="gameboard__top-diamond" aria-label="Diamonds available">
+                <div className="gameboard__diamond-icon-wrap">
+                  <img src="/icons/diamond.png" alt="" className="gameboard__diamond-icon" />
+                  <span className="gameboard__diamond-sparkle gameboard__diamond-sparkle--one" />
+                  <span className="gameboard__diamond-sparkle gameboard__diamond-sparkle--two" />
+                </div>
                 <span className="gameboard__diamond-value">{diamondBalance}</span>
               </div>
-              <div className="gameboard__top-stat">
-                <span className="gameboard__top-stat-label">Level</span>
-                <span className="gameboard__top-stat-value">Lv.{currentLevel?.id ?? '--'}</span>
+              <div className="gameboard__top-token" aria-label="Current level">
+                <span className="gameboard__top-token-label">Level.</span>
+                <span className="gameboard__top-token-value">{currentLevel?.id ?? '--'}</span>
               </div>
-              <div className="gameboard__top-stat">
-                <span className="gameboard__top-stat-label">Moves</span>
-                <span className="gameboard__top-stat-value">{gameState.moves}</span>
+              <div className="gameboard__top-token" aria-label="Moves used">
+                <span className="gameboard__top-token-label">Moves.</span>
+                <span className="gameboard__top-token-value">{gameState.moves}</span>
               </div>
             </div>
             <button

@@ -192,6 +192,16 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     return audio;
   }, [ensureAudioElement]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    ensureBackgroundMusic();
+    ensureAudioElement(buttonSoundRef, '/music_effects/button_press.wav', { volume: 0.6 });
+    ensureAudioElement(levelCompleteSoundRef, '/music_effects/level_completed.mp3', { volume: 0.7 });
+  }, [ensureAudioElement, ensureBackgroundMusic]);
+
   const playButtonSound = useCallback(() => {
     if (!soundEnabled) {
       return;
@@ -279,6 +289,34 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       window.removeEventListener('keydown', resumeOnInteraction);
     };
   }, [ensureBackgroundMusic, musicEnabled]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    const handleVisibility = () => {
+      const audio = backgroundMusicRef.current;
+      if (!audio) {
+        return;
+      }
+
+      if (document.visibilityState === 'hidden') {
+        audio.pause();
+      } else if (musicEnabled) {
+        const playPromise = audio.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch(() => undefined);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [musicEnabled]);
 
   useEffect(() => () => {
     backgroundMusicRef.current?.pause();

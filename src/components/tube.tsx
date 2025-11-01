@@ -35,11 +35,6 @@ export const Tube: React.FC<TubeProps> = ({
   const capacityPaddingX = Math.max(8, 10 * scaleFactor);
   const capacityPaddingY = Math.max(4, 5 * scaleFactor);
   const capacityFontSize = Math.max(10, 12 * scaleFactor);
-  const selectionBadgeOffset = 30 * scaleFactor;
-  const selectionPaddingX = Math.max(10, 12 * scaleFactor);
-  const selectionPaddingY = Math.max(4, 6 * scaleFactor);
-  const selectionFontSize = Math.max(10, 12 * scaleFactor);
-
   const isLocked = Boolean(tube.locked);
   const isDisabled = isLocked;
   const allowAnimation = !reduceMotion;
@@ -220,39 +215,6 @@ export const Tube: React.FC<TubeProps> = ({
           )}
         </div>
 
-        {/* Selection indicator */}
-        {allowAnimation ? (
-          <AnimatePresence>
-            {isSelected && (
-              <motion.div
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0, opacity: 0 }}
-                className="absolute left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full font-bold shadow-lg"
-                style={{
-                  top: -selectionBadgeOffset,
-                  padding: `${selectionPaddingY}px ${selectionPaddingX}px`,
-                  fontSize: selectionFontSize
-                }}
-              >
-                SELECTED
-              </motion.div>
-            )}
-          </AnimatePresence>
-        ) : (
-          isSelected && (
-            <div
-              className="absolute left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full font-bold shadow-lg"
-              style={{
-                top: -selectionBadgeOffset,
-                padding: `${selectionPaddingY}px ${selectionPaddingX}px`,
-                fontSize: selectionFontSize
-              }}
-            >
-              SELECTED
-            </div>
-          )
-        )}
       </div>
 
       {/* Capacity indicator */}
