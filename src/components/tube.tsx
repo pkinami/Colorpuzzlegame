@@ -1,7 +1,5 @@
-import React, { useState } from 'react';
-import { Tube as TubeType } from '../utils/level-data';
-import { motion, AnimatePresence } from 'motion/react';
-import { Lock } from 'lucide-react';
+import React from 'react';
+import type { Tube as TubeType } from '../utils/level-data';
 
 interface TubeProps {
   tube: TubeType;
@@ -12,273 +10,114 @@ interface TubeProps {
   reduceMotion?: boolean;
 }
 
+const clampScale = (value: number) => Math.max(0.7, value);
+
 export const Tube: React.FC<TubeProps> = ({
   tube,
   isSelected,
   onSelect,
   scale = 1,
-  heightScale = 1,
-  reduceMotion = false
+  heightScale = 1
 }) => {
-  const [isHovered, setIsHovered] = useState(false);
-  const scaleFactor = Math.max(0.6, scale);
-  const verticalFactor = Math.max(1, heightScale);
-  const baseSegmentHeight = 52;
-  const baseTubeWidth = 68;
-  const segmentHeight = baseSegmentHeight * scaleFactor * verticalFactor;
+  const scaleFactor = clampScale(scale);
+  const verticalScale = Math.max(1, heightScale);
+
+  const baseSegmentHeight = 46;
+  const baseTubeWidth = 56;
+
+  const segmentHeight = baseSegmentHeight * scaleFactor * verticalScale;
   const tubeWidth = baseTubeWidth * scaleFactor;
   const tubeHeight = tube.capacity * segmentHeight;
-  const borderWidth = Math.max(2, 3.5 * scaleFactor);
-  const neckHeight = 16 * scaleFactor * Math.min(verticalFactor, 1.2);
-  const neckWidth = tubeWidth * 0.58;
-  const capacityBadgeMargin = 16 * scaleFactor;
-  const capacityPaddingX = Math.max(8, 10 * scaleFactor);
-  const capacityPaddingY = Math.max(4, 5 * scaleFactor);
-  const capacityFontSize = Math.max(10, 12 * scaleFactor);
-  const selectionBadgeOffset = 30 * scaleFactor;
-  const selectionPaddingX = Math.max(10, 12 * scaleFactor);
-  const selectionPaddingY = Math.max(4, 6 * scaleFactor);
-  const selectionFontSize = Math.max(10, 12 * scaleFactor);
+
+  const borderWidth = Math.max(2, 3 * scaleFactor);
+  const lipHeight = 12 * scaleFactor;
+  const lipWidth = tubeWidth * 0.72;
+  const lipRadius = lipWidth / 2;
+  const bodyRadius = tubeWidth * 0.36;
+
+  const innerPadding = Math.max(3, 4 * scaleFactor);
+  const segmentGap = Math.max(1, 2 * scaleFactor);
+
+  const borderColor = isSelected ? '#facc15' : '#d4d4d8';
+  const bodyBackground = 'rgba(20, 20, 20, 0.88)';
+  const lipBackground = 'rgba(35, 35, 35, 0.95)';
 
   const isLocked = Boolean(tube.locked);
-  const isDisabled = isLocked;
-  const allowAnimation = !reduceMotion;
-  const allowHoverEffects = allowAnimation && !isDisabled;
+
+  const handleClick = () => {
+    if (isLocked) {
+      return;
+    }
+    onSelect();
+  };
 
   return (
-    <motion.div
-      className={`flex flex-col items-center ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-      onClick={() => {
-        if (!isDisabled) {
-          onSelect();
+    <div
+      className={`flex flex-col items-center ${isLocked ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+      role="button"
+      tabIndex={isLocked ? -1 : 0}
+      onClick={handleClick}
+      onKeyDown={event => {
+        if (isLocked) {
+          return;
+        }
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          handleClick();
         }
       }}
-      onHoverStart={() => {
-        if (allowHoverEffects) {
-          setIsHovered(true);
-        }
-      }}
-      onHoverEnd={() => {
-        if (allowAnimation) {
-          setIsHovered(false);
-        }
-      }}
-      whileHover={allowHoverEffects ? { scale: 1.05, y: -4 } : undefined}
     >
-      {/* Tube container */}
-      <div className="relative">
-        {/* Glow effect when selected */}
-        {allowAnimation ? (
-          <AnimatePresence>
-            {isSelected && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 rounded-b-3xl blur-xl"
-                style={{
-                  background: 'radial-gradient(circle, rgba(59, 130, 246, 0.6), transparent)',
-                  transform: 'scale(1.2)'
-                }}
-              />
-            )}
-          </AnimatePresence>
-        ) : (
-          isSelected && (
-            <div
-              className="absolute inset-0 rounded-b-3xl blur-xl"
-              style={{
-                background: 'radial-gradient(circle, rgba(59, 130, 246, 0.5), transparent)',
-                transform: 'scale(1.2)'
-              }}
-            />
-          )
-        )}
-
+      <div className="relative flex flex-col items-center" style={{ width: tubeWidth }}>
         <div
-          className={`relative rounded-b-3xl overflow-hidden ${
-            isSelected
-              ? 'border-cyan-400 shadow-xl shadow-cyan-500/50'
-              : isDisabled
-                ? 'border-gray-700/50 shadow-md opacity-70'
-                : 'border-gray-500/40 shadow-md'
-          } ${allowAnimation ? 'transition-colors duration-300' : ''}`}
+          style={{
+            width: lipWidth,
+            height: lipHeight,
+            border: `${borderWidth}px solid ${borderColor}`,
+            borderBottomWidth: Math.max(1, borderWidth - 1),
+            borderBottomColor: 'transparent',
+            borderRadius: `${lipRadius}px ${lipRadius}px 0 0`,
+            background: lipBackground,
+            boxShadow: 'inset 0 2px 0 rgba(255, 255, 255, 0.12)'
+          }}
+        />
+        <div
           style={{
             width: tubeWidth,
             height: tubeHeight,
-            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03))',
-            backdropFilter: 'blur(10px)',
-            borderWidth,
-            borderStyle: 'solid'
+            border: `${borderWidth}px solid ${borderColor}`,
+            borderTop: 'none',
+            borderBottomWidth: borderWidth * 1.15,
+            borderRadius: `0 0 ${bodyRadius}px ${bodyRadius}px`,
+            background: bodyBackground,
+            padding: `${innerPadding}px`,
+            display: 'flex',
+            flexDirection: 'column-reverse',
+            justifyContent: 'flex-start',
+            gap: `${segmentGap}px`,
+            boxShadow: 'inset 0 -6px 12px rgba(0, 0, 0, 0.35)'
           }}
         >
-          {/* Glass reflection effect */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background: 'linear-gradient(90deg, transparent 45%, rgba(255, 255, 255, 0.08) 50%, transparent 65%)',
-              opacity: isHovered ? 0.45 : 0.28,
-              transition: allowAnimation ? 'opacity 0.3s' : undefined
-            }}
-          />
-
-          {/* Color segments */}
-          <div className="absolute bottom-0 left-0 right-0 flex flex-col-reverse">
-            {tube.segments.map((segment, index) => (
+          {tube.segments.map((segment, index) => {
+            const isTop = index === tube.segments.length - 1;
+            const radius = Math.max(6, 8 * scaleFactor);
+            const topRadius = Math.max(radius + 4, 12 * scaleFactor);
+            return (
               <div
                 key={segment.id}
-                className="w-full relative transition-transform duration-200"
                 style={{
-                  height: segmentHeight,
+                  height: segmentHeight - segmentGap,
                   backgroundColor: segment.color,
-                  boxShadow: `inset 0 -2px 8px rgba(0, 0, 0, 0.18), 0 0 14px ${segment.color}33`,
-                  borderBottom: index === 0 ? 'none' : '2px solid rgba(0, 0, 0, 0.15)'
+                  borderRadius: isTop
+                    ? `${topRadius}px ${topRadius}px ${radius}px ${radius}px`
+                    : `${radius}px`,
+                  boxShadow: 'inset 0 -3px 0 rgba(0, 0, 0, 0.25)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)'
                 }}
-              >
-                {/* Liquid shimmer effect */}
-                {allowAnimation ? (
-                  <motion.div
-                    className="absolute inset-0"
-                    style={{
-                      background: `linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, transparent 50%, rgba(0, 0, 0, 0.1) 100%)`
-                    }}
-                    animate={{
-                      opacity: [0.3, 0.6, 0.3]
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                      ease: 'easeInOut'
-                    }}
-                  />
-                ) : (
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      background: `linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, transparent 60%, rgba(0, 0, 0, 0.12) 100%)`
-                    }}
-                  />
-                )}
-
-                {/* Top surface wave */}
-                {index === tube.segments.length - 1 && (
-                  allowAnimation ? (
-                    <motion.div
-                      className="absolute top-0 left-0 right-0 h-1"
-                      style={{
-                        background: `linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent)`
-                      }}
-                      animate={{
-                        x: [-20, 20, -20]
-                      }}
-                      transition={{
-                        duration: 3,
-                        repeat: Infinity,
-                        ease: 'easeInOut'
-                      }}
-                    />
-                  ) : (
-                    <div
-                      className="absolute top-0 left-0 right-0 h-1"
-                      style={{
-                        background: `linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent)`
-                      }}
-                    />
-                  )
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Tube neck (top opening) */}
-          <div
-            className={`absolute left-1/2 transform -translate-x-1/2 border-b-0 rounded-t-lg ${
-              isSelected ? 'border-cyan-400' : 'border-gray-600/50'
-            } ${allowAnimation ? 'transition-colors duration-300' : ''}`}
-            style={{
-              width: neckWidth,
-              height: neckHeight,
-              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05))',
-              backdropFilter: 'blur(10px)',
-              borderWidth,
-              borderStyle: 'solid',
-              top: -neckHeight
-            }}
-          />
-
-          {/* Locked overlay */}
-          {isLocked && (
-            <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center gap-2 z-20 text-white font-bold px-3 text-center">
-              <Lock size={24} className="text-amber-200" />
-              <span className="text-xs uppercase tracking-wide">Locked</span>
-              {tube.unlockCondition?.type === 'sortedTubes' && (
-                <span className="text-[10px] font-semibold text-white/80">
-                  Sort {tube.unlockCondition.requirement} tube{tube.unlockCondition.requirement === 1 ? '' : 's'}
-                </span>
-              )}
-            </div>
-          )}
+              />
+            );
+          })}
         </div>
-
-        {/* Selection indicator */}
-        {allowAnimation ? (
-          <AnimatePresence>
-            {isSelected && (
-              <motion.div
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0, opacity: 0 }}
-                className="absolute left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full font-bold shadow-lg"
-                style={{
-                  top: -selectionBadgeOffset,
-                  padding: `${selectionPaddingY}px ${selectionPaddingX}px`,
-                  fontSize: selectionFontSize
-                }}
-              >
-                SELECTED
-              </motion.div>
-            )}
-          </AnimatePresence>
-        ) : (
-          isSelected && (
-            <div
-              className="absolute left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full font-bold shadow-lg"
-              style={{
-                top: -selectionBadgeOffset,
-                padding: `${selectionPaddingY}px ${selectionPaddingX}px`,
-                fontSize: selectionFontSize
-              }}
-            >
-              SELECTED
-            </div>
-          )
-        )}
       </div>
-
-      {/* Capacity indicator */}
-      <motion.div
-        className={`rounded-full font-bold ${allowAnimation ? 'transition-all' : ''}`}
-        style={{
-          marginTop: capacityBadgeMargin,
-          padding: `${capacityPaddingY}px ${capacityPaddingX}px`,
-          background: isSelected
-            ? 'linear-gradient(135deg, rgba(34, 211, 238, 0.3), rgba(59, 130, 246, 0.3))'
-            : 'rgba(107, 114, 128, 0.3)',
-          border: isSelected ? '1px solid rgba(34, 211, 238, 0.5)' : '1px solid rgba(107, 114, 128, 0.3)',
-          color: isSelected ? '#22d3ee' : '#9ca3af',
-          fontSize: capacityFontSize
-        }}
-        animate={allowAnimation && !isDisabled ? { scale: isHovered ? 1.1 : 1 } : { scale: 1 }}
-        transition={allowAnimation ? undefined : { duration: 0 }}
-      >
-        {tube.segments.length}/{tube.capacity}
-      </motion.div>
-
-      {tube.starter && !tube.locked && (
-        <div className="mt-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wide bg-emerald-500/25 border border-emerald-400/40 text-emerald-100 word-shadow-soft">
-          Start Here
-        </div>
-      )}
-    </motion.div>
+    </div>
   );
 };

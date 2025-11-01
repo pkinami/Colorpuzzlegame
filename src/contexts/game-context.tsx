@@ -63,7 +63,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     isFailed: false,
     selectedTube: null,
     userProgress: {},
-    coinBalance: 0,
+    coinBalance: 100,
     lastCoinsEarned: 0
   });
 
